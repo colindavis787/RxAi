@@ -1,3 +1,4 @@
+HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -172,3 +173,19 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+=======
+# Python virtual environment
+pharmacy_tool_env/
+# Streamlit temporary files
+temp.xlsx
+# Output files
+cleaned_pharmacy_claims.csv
+anomalies.csv
+brand_generic_pie.png
+claims_per_member_bar.png
+# Python cache
+__pycache__/
+*.pyc
+# Streamlit secrets
+.streamlit/secrets.toml
+>>>>>>> 8142bd9 (Initial commit of pharmacy claims analyzer with secrets)
