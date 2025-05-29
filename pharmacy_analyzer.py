@@ -15,6 +15,15 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
+# Medication-to-condition mapping
+MEDICATION_CONDITIONS = {
+    "AMOXICILLIN": ["Bacterial Infections (e.g., strep throat, ear infections)"],
+    "DROSPIRENONE/ETHINYL ESTRADIOL": ["Contraception", "Acne", "Premenstrual Syndrome"],
+    "TREMFYA": ["Psoriasis", "Psoriatic Arthritis"],
+    # Add more mappings as needed
+    "UNKNOWN": ["Unknown Condition"]
+}
+
 # Store claims in SQLite database
 def store_claims(df, file_name):
     conn = sqlite3.connect('claims_history.db')
@@ -89,6 +98,23 @@ def analyze_claims(df):
     if pharmacy_cols:
         results['pharmacy_counts'] = df[pharmacy_cols[0]].value_counts().head(10)
     
+    # Medication-condition analysis
+    drug_cols = [col for col in df.columns if 'drug' in col.lower() or 'medication' in col.lower()]
+    if id_cols and drug_cols:
+        id_col = id_cols[0]
+        drug_col = drug_cols[0]
+        # Group by member and collect unique medications
+        member_meds = df.groupby(id_col)[drug_col].unique().reset_index()
+        # Map medications to conditions
+        member_meds['Conditions'] = member_meds[drug_col].apply(
+            lambda drugs: [
+                condition 
+                for drug in drugs 
+                for condition in MEDICATION_CONDITIONS.get(drug.upper(), MEDICATION_CONDITIONS["UNKNOWN"])
+            ]
+        )
+        results['member_medications'] = member_meds[[id_col, drug_col, 'Conditions']]
+    
     return results
 
 # Step 4: Detect anomalies
@@ -156,7 +182,7 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
     
     for key, value in monthly_data.groupby(id_col):
         member_data = value.sort_values('month_ordinal')
-        if len(member_data) < 5:  # Fallback to linear regression for less data
+        if len(member_data) < 5:
             if len(member_data) >= 2:
                 X = member_data['month_ordinal'].values.reshape(-1, 1)
                 y_quantity = member_data[quantity_col].values
@@ -173,17 +199,15 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
                     predicted_costs *= (1 + inflation_rate / 4)
                     predictions[f"{key}_cost"] = predicted_costs.tolist()
             continue
-        # Predict utilization with ARIMA
         try:
             y_quantity = member_data[quantity_col].values
-            model = ARIMA(y_quantity, order=(1, 0, 0))  # Adjusted to ARIMA(1,0,0)
+            model = ARIMA(y_quantity, order=(1, 0, 0))
             model_fit = model.fit()
             predicted_quantities = model_fit.forecast(steps=3)
             predictions[f"{key}_utilization"] = predicted_quantities.tolist()
         except:
             predictions[f"{key}_utilization"] = [0, 0, 0]
         
-        # Predict cost with ARIMA
         if cost_cols:
             try:
                 y_cost = member_data[cost_cols[0]].values
