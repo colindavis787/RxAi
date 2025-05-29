@@ -7,12 +7,18 @@ from sklearn.linear_model import LinearRegression
 import datetime
 import sqlite3
 import numpy as np
+import os
+from statsmodels.tsa.arima.model import ARIMA
+import warnings
+
+# Suppress ARIMA convergence warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Store claims in SQLite database
 def store_claims(df, file_name):
     conn = sqlite3.connect('claims_history.db')
     cursor = conn.cursor()
-    # Create table if not exists
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS claims (
             upload_id TEXT,
@@ -22,10 +28,8 @@ def store_claims(df, file_name):
             row_id INTEGER
         )
     ''')
-    # Generate upload ID and date
     upload_id = f"{file_name}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
     upload_date = datetime.datetime.now().isoformat()
-    # Store each row and column
     for row_id, row in df.iterrows():
         for col in df.columns:
             cursor.execute('''
@@ -130,7 +134,7 @@ def visualize_data(analysis_results, df):
     return chart_files
 
 # Step 6: Predict future utilization and cost
-def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols):
+def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, inflation_rate=0.05):
     predictions = {}
     if not (id_cols and date_cols and quantity_cols):
         return predictions, "Missing required columns for prediction."
@@ -139,66 +143,75 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols):
     date_col = date_cols[0]
     quantity_col = quantity_cols[0]
     
-    # Convert dates to numeric (days since min date)
     df[date_col] = pd.to_datetime(df[date_col])
     min_date = df[date_col].min()
     df['days_since_min'] = (df[date_col] - min_date).dt.days
     
-    # Group by ID and month
     df['month'] = df[date_col].dt.to_period('M')
     monthly_data = df.groupby([id_col, 'month']).agg({
         quantity_col: 'sum',
         cost_cols[0]: 'sum' if cost_cols else lambda x: 0
     }).reset_index()
+    monthly_data['month_ordinal'] = monthly_data['month'].apply(lambda x: x.ordinal)
     
-    # Predict utilization
-    for member in monthly_data[id_col].unique():
-        member_data = monthly_data[monthly_data[id_col] == member]
-        if len(member_data) < 2:
+    for key, value in monthly_data.groupby(id_col):
+        member_data = value.sort_values('month_ordinal')
+        if len(member_data) < 5:  # Fallback to linear regression for less data
+            if len(member_data) >= 2:
+                X = member_data['month_ordinal'].values.reshape(-1, 1)
+                y_quantity = member_data[quantity_col].values
+                model = LinearRegression()
+                model.fit(X, y_quantity)
+                future_months = np.array([X[-1][0] + i for i in range(1, 4)]).reshape(-1, 1)
+                predicted_quantities = model.predict(future_months)
+                predictions[f"{key}_utilization"] = predicted_quantities.tolist()
+                
+                if cost_cols:
+                    y_cost = member_data[cost_cols[0]].values
+                    model.fit(X, y_cost)
+                    predicted_costs = model.predict(future_months)
+                    predicted_costs *= (1 + inflation_rate / 4)
+                    predictions[f"{key}_cost"] = predicted_costs.tolist()
             continue
-        X = member_data['month'].apply(lambda x: x.ordinal).values.reshape(-1, 1)
-        y_quantity = member_data[quantity_col].values
-        model = LinearRegression()
-        model.fit(X, y_quantity)
-        # Predict next 3 months
-        future_months = np.array([X[-1][0] + i for i in range(1, 4)]).reshape(-1, 1)
-        predicted_quantities = model.predict(future_months)
-        predictions[f"{member}_utilization"] = predicted_quantities.tolist()
+        # Predict utilization with ARIMA
+        try:
+            y_quantity = member_data[quantity_col].values
+            model = ARIMA(y_quantity, order=(1, 0, 0))  # Adjusted to ARIMA(1,0,0)
+            model_fit = model.fit()
+            predicted_quantities = model_fit.forecast(steps=3)
+            predictions[f"{key}_utilization"] = predicted_quantities.tolist()
+        except:
+            predictions[f"{key}_utilization"] = [0, 0, 0]
         
-        # Predict cost with 5% annual inflation
+        # Predict cost with ARIMA
         if cost_cols:
-            y_cost = member_data[cost_cols[0]].values
-            model.fit(X, y_cost)
-            predicted_costs = model.predict(future_months)
-            # Apply 5% annual inflation (1.25% per 3 months)
-            predicted_costs *= 1.0125
-            predictions[f"{member}_cost"] = predicted_costs.tolist()
+            try:
+                y_cost = member_data[cost_cols[0]].values
+                model = ARIMA(y_cost, order=(1, 0, 0))
+                model_fit = model.fit()
+                predicted_costs = model_fit.forecast(steps=3)
+                predicted_costs *= (1 + inflation_rate / 4)
+                predictions[f"{key}_cost"] = predicted_costs.tolist()
+            except:
+                predictions[f"{key}_cost"] = [0, 0, 0]
     
-    return predictions, "Predictions generated for next 3 months."
+    return predictions, f"Predictions generated for next 3 months with {inflation_rate*100}% annual inflation."
 
 # Step 7: Main function
-def main(file_path):
-    # Load
+def main(file_path, inflation_rate=0.05):
     df, load_msg = load_claims_file(file_path)
     if df is None:
         return None, load_msg, None, None, None, None
-    # Clean
     df, clean_msg = clean_claims_data(df)
-    # Store in database
     upload_id = store_claims(df, os.path.basename(file_path))
-    # Analyze
     analysis_results = analyze_claims(df)
-    # Anomalies
     anomalies, anomaly_msg = detect_anomalies(df)
-    # Predictions
     id_cols = [col for col in df.columns if 'member' in col.lower() or 'id' in col.lower()]
     date_cols = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
     quantity_cols = [col for col in df.columns if 'quantity' in col.lower()]
     cost_cols = [col for col in df.columns if 'cost' in col.lower()]
-    predictions, prediction_msg = predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols)
-    # Charts
+    predictions, prediction_msg = predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, inflation_rate)
     chart_files = visualize_data(analysis_results, df)
-    # Save results
     df.to_csv('cleaned_pharmacy_claims.csv', index=False)
     if not anomalies.empty:
         anomalies.to_csv('anomalies.csv', index=False)
