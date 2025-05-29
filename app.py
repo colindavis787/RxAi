@@ -14,7 +14,7 @@ try:
         base_url="https://api.x.ai/v1"
     )
 except Exception as e:
-    st.error(f"Error initializing AI client: {str(e)}. Please set XAI_API_KEY.")
+    st.error(f"Error initializing AI client: {str(e)}. Please check XAI_API_KEY.")
     client = None
 
 # Initialize session state for chat history
@@ -85,7 +85,7 @@ if uploaded_file:
                             {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context. Be concise, accurate, and use the raw data sample for specific claim details."},
                             {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
                         ],
-                        max_tokens=300  # Increased for complex answers
+                        max_tokens=300
                     )
                     answer = response.choices[0].message.content.strip()
                     # Store in chat history
