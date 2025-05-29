@@ -31,7 +31,7 @@ if uploaded_file:
         f.write(uploaded_file.getbuffer())
     
     # Run analysis
-    cleaned_df, messages, analysis_results, anomalies, chart_files = main(temp_file)
+    cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file)
     
     # Display messages
     st.write("### Status")
@@ -39,22 +39,42 @@ if uploaded_file:
     
     if cleaned_df is not None:
         # Display analysis results
-        st.write("### Claims per Member")
-        st.dataframe(analysis_results['claims_per_member'])
+        if 'numeric_summary' in analysis_results:
+            st.write("### Numeric Column Summary")
+            st.dataframe(analysis_results['numeric_summary'])
         
-        st.write("### Brand vs Generic Distribution")
-        st.dataframe(analysis_results['brand_generic_dist'].reset_index())
-        
-        st.write("### Channel Distribution")
-        st.dataframe(analysis_results['channel_dist'].reset_index())
-        
-        st.write("### Average Quantity and Days Supply per Drug")
-        st.dataframe(analysis_results['drug_stats'])
-        
+        for key, value in analysis_results.items():
+            if key.endswith('_counts'):
+                st.write(f"### {key.replace('_counts', '')} Distribution")
+                st.dataframe(value.reset_index(name='Count'))
+            
+            elif key == 'claims_per_id':
+                st.write("### Claims per ID")
+                st.dataframe(value)
+            
+            elif key == 'cost_summary':
+                st.write("### Total Cost per ID")
+                st.dataframe(value)
+    
         # Display anomalies
-        st.write("### Detected Anomalies (Possible Errors or Fraud)")
+        st.write("### Detected Anomalies")
         st.dataframe(anomalies)
         
+        # Display predictions
+        st.write("### Future Utilization and Cost Predictions (Next 3 Months)")
+        if predictions:
+            for key, value in predictions.items():
+                if key.endswith('_utilization'):
+                    member = key.replace('_utilization', '')
+                    st.write(f"**Member {member} Predicted Utilization (Claims):**")
+                    st.write(f"Month 1: {value[0]:.2f}, Month 2: {value[1]:.2f}, Month 3: {value[2]:.2f}")
+                elif key.endswith('_cost'):
+                    member = key.replace('_cost', '')
+                    st.write(f"**Member {member} Predicted Cost (with 5% annual inflation):**")
+                    st.write(f"Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}")
+        else:
+            st.write("No predictions available. Ensure ID, date, and quantity columns exist.")
+    
         # Display charts
         st.write("### Visualizations")
         for chart in chart_files:
@@ -62,33 +82,44 @@ if uploaded_file:
         
         # Prepare data context for AI
         context = ""
-        context += "Claims per Member:\n" + analysis_results['claims_per_member'].to_string(index=False) + "\n\n"
-        context += "Brand vs Generic Distribution:\n" + analysis_results['brand_generic_dist'].to_string() + "\n\n"
-        context += "Channel Distribution:\n" + analysis_results['channel_dist'].to_string() + "\n\n"
-        context += "Average Quantity and Days Supply per Drug:\n" + analysis_results['drug_stats'].to_string(index=False) + "\n\n"
-        context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
+        if 'numeric_summary' in analysis_results:
+            context += "Numeric Column Summary:\n" + analysis_results['numeric_summary'].to_string() + "\n\n"
+        for key, value in analysis_results.items():
+            if key.endswith('_counts'):
+                context += f"{key.replace('_counts', '')} Distribution:\n" + value.to_string() + "\n\n"
+            elif key == 'claims_per_id':
+                context += "Claims per ID:\n" + value.to_string(index=False) + "\n\n"
+            elif key == 'cost_summary':
+                context += "Total Cost per ID:\n" + value.to_string(index=False) + "\n\n"
         context += "Raw Data Sample (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
+        context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
+        context += "Predictions (Next 3 Months):\n"
+        for key, value in predictions.items():
+            if key.endswith('_utilization'):
+                member = key.replace('_utilization', '')
+                context += f"Member {member} Utilization: Month 1: {value[0]:.2f}, Month 2: {value[1]:.2f}, Month 3: {value[2]:.2f}\n"
+            elif key.endswith('_cost'):
+                member = key.replace('_cost', '')
+                context += f"Member {member} Cost: Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}\n"
         
         # Q&A Section
         st.write("### Ask a Question About the Data")
-        user_question = st.text_input("Enter your question (e.g., 'How many claims does Member 8 have?' or 'What drugs did Member 2 claim?')")
+        user_question = st.text_input("Enter your question (e.g., 'What’s the predicted cost for Member 9?' or 'How many claims per ID?')")
         
         if user_question:
             if not user_question.strip():
                 st.warning("Please enter a valid question.")
             elif client:
                 try:
-                    # Send question to Grok
                     response = client.chat.completions.create(
                         model="grok-3",
                         messages=[
-                            {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context. Be concise, accurate, and use the raw data sample for specific claim details."},
+                            {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns and predictions. Be concise and accurate."},
                             {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
                         ],
                         max_tokens=300
                     )
                     answer = response.choices[0].message.content.strip()
-                    # Store in chat history
                     st.session_state.chat_history.append((user_question, answer))
                     st.write("**Answer**")
                     st.write(answer)
