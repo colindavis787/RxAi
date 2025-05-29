@@ -3,6 +3,8 @@ import os
 from pharmacy_analyzer import main
 from openai import OpenAI
 import pandas as pd
+import sqlite3
+import matplotlib.pyplot as plt
 
 # Set page title
 st.title("Pharmacy Claims Analyzer")
@@ -21,6 +23,22 @@ except Exception as e:
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
+# Display historical uploads
+st.write("### Past Uploads")
+try:
+    conn = sqlite3.connect('claims_history.db')
+    past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
+    conn.close()
+    if not past_uploads.empty:
+        st.dataframe(past_uploads)
+    else:
+        st.write("No past uploads found.")
+except Exception as e:
+    st.error(f"Error accessing historical data: {str(e)}")
+
+# Inflation rate slider
+inflation_rate = st.slider("Annual Drug Price Inflation (%)", 0.0, 10.0, 5.0) / 100
+
 # File uploader
 uploaded_file = st.file_uploader("Upload Excel file", type="xlsx")
 
@@ -30,8 +48,8 @@ if uploaded_file:
     with open(temp_file, "wb") as f:
         f.write(uploaded_file.getbuffer())
     
-    # Run analysis
-    cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file)
+    # Run analysis with inflation rate
+    cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
     
     # Display messages
     st.write("### Status")
@@ -55,6 +73,10 @@ if uploaded_file:
             elif key == 'cost_summary':
                 st.write("### Total Cost per ID")
                 st.dataframe(value)
+            
+            elif key == 'member_medications':
+                st.write("### Medications and Likely Conditions per Member")
+                st.dataframe(value)
     
         # Display anomalies
         st.write("### Detected Anomalies")
@@ -70,8 +92,25 @@ if uploaded_file:
                     st.write(f"Month 1: {value[0]:.2f}, Month 2: {value[1]:.2f}, Month 3: {value[2]:.2f}")
                 elif key.endswith('_cost'):
                     member = key.replace('_cost', '')
-                    st.write(f"**Member {member} Predicted Cost (with 5% annual inflation):**")
+                    st.write(f"**Member {member} Predicted Cost (with {inflation_rate*100}% annual inflation):**")
                     st.write(f"Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}")
+            
+            # Plot predictions
+            plt.figure(figsize=(10, 6))
+            for key, value in predictions.items():
+                if key.endswith('_utilization'):
+                    member = key.replace('_utilization', '')
+                    plt.plot([1, 2, 3], value, label=f"Member {member} Utilization")
+                elif key.endswith('_cost'):
+                    member = key.replace('_cost', '')
+                    plt.plot([1, 2, 3], value, '--', label=f"Member {member} Cost ($)")
+            plt.title('Predicted Utilization and Cost (Next 3 Months)')
+            plt.xlabel('Month')
+            plt.ylabel('Value')
+            plt.legend()
+            plt.savefig('prediction_plot.png')
+            plt.close()
+            st.image('prediction_plot.png', caption='Prediction Plot')
         else:
             st.write("No predictions available. Ensure ID, date, and quantity columns exist.")
     
@@ -91,6 +130,8 @@ if uploaded_file:
                 context += "Claims per ID:\n" + value.to_string(index=False) + "\n\n"
             elif key == 'cost_summary':
                 context += "Total Cost per ID:\n" + value.to_string(index=False) + "\n\n"
+            elif key == 'member_medications':
+                context += "Medications and Conditions per Member:\n" + value.to_string(index=False) + "\n\n"
         context += "Raw Data Sample (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
         context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
         context += "Predictions (Next 3 Months):\n"
@@ -104,7 +145,7 @@ if uploaded_file:
         
         # Q&A Section
         st.write("### Ask a Question About the Data")
-        user_question = st.text_input("Enter your question (e.g., 'What’s the predicted cost for Member 9?' or 'How many claims per ID?')")
+        user_question = st.text_input("Enter your question (e.g., 'What condition is Member 9’s medication treating?' or 'How many claims per ID?')")
         
         if user_question:
             if not user_question.strip():
@@ -114,7 +155,7 @@ if uploaded_file:
                     response = client.chat.completions.create(
                         model="grok-3",
                         messages=[
-                            {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns and predictions. Be concise and accurate."},
+                            {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns, predictions, and medication conditions. Be concise and accurate."},
                             {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
                         ],
                         max_tokens=300
