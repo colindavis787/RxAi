@@ -10,10 +10,37 @@ import numpy as np
 import os
 import requests
 import warnings
+from cryptography.fernet import Fernet
+import base64
 
 # Suppress ARIMA convergence warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+# Generate or load encryption key
+def get_encryption_key():
+    key_file = "encryption_key.key"
+    if not os.path.exists(key_file):
+        key = Fernet.generate_key()
+        with open(key_file, "wb") as f:
+            f.write(key)
+        os.chmod(key_file, 0o600)
+    with open(key_file, "rb") as f:
+        key = f.read()
+    return Fernet(key)
+
+# Encrypt data
+def encrypt_data(data, cipher):
+    if isinstance(data, str):
+        return cipher.encrypt(data.encode()).decode()
+    return data
+
+# Decrypt data (for display, if needed)
+def decrypt_data(data, cipher):
+    try:
+        return cipher.decrypt(data.encode()).decode()
+    except:
+        return data
 
 # Fallback medication-to-condition mapping
 MEDICATION_CONDITIONS = {
@@ -38,8 +65,9 @@ def get_drug_conditions(drug_name):
     except:
         return MEDICATION_CONDITIONS.get(drug_name.upper(), MEDICATION_CONDITIONS["UNKNOWN"])
 
-# Store claims in SQLite database
+# Store claims in SQLite database with encryption
 def store_claims(df, file_name):
+    cipher = get_encryption_key()
     conn = sqlite3.connect('claims_history.db')
     cursor = conn.cursor()
     cursor.execute('''
@@ -55,10 +83,11 @@ def store_claims(df, file_name):
     upload_date = datetime.datetime.now().isoformat()
     for row_id, row in df.iterrows():
         for col in df.columns:
+            encrypted_value = encrypt_data(str(row[col]), cipher)
             cursor.execute('''
                 INSERT INTO claims (upload_id, upload_date, column_name, column_value, row_id)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (upload_id, upload_date, col, str(row[col]), row_id))
+            ''', (upload_id, upload_date, col, encrypted_value, row_id))
     conn.commit()
     conn.close()
     return upload_id
@@ -242,12 +271,22 @@ def main(file_path, inflation_rate=0.05):
     upload_id = store_claims(df, os.path.basename(file_path))
     analysis_results = analyze_claims(df)
     anomalies, anomaly_msg = detect_anomalies(df)
+    cipher = get_encryption_key()
+    if not anomalies.empty:
+        # Encrypt sensitive columns in anomalies
+        sensitive_cols = [col for col in anomalies.columns if 'member' in col.lower() or 'drug' in col.lower()]
+        for col in sensitive_cols:
+            anomalies[col] = anomalies[col].apply(lambda x: encrypt_data(str(x), cipher))
     id_cols = [col for col in df.columns if 'member' in col.lower() or 'id' in col.lower()]
     date_cols = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
     quantity_cols = [col for col in df.columns if 'quantity' in col.lower()]
     cost_cols = [col for col in df.columns if 'cost' in col.lower()]
     predictions, prediction_msg = predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, inflation_rate)
     chart_files = visualize_data(analysis_results, df)
+    # Encrypt sensitive columns in cleaned_df before saving
+    sensitive_cols = [col for col in df.columns if 'member' in col.lower() or 'drug' in col.lower()]
+    for col in sensitive_cols:
+        df[col] = df[col].apply(lambda x: encrypt_data(str(x), cipher))
     df.to_csv('cleaned_pharmacy_claims.csv', index=False)
     if not anomalies.empty:
         anomalies.to_csv('anomalies.csv', index=False)
