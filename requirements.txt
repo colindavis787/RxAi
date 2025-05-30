@@ -7,3 +7,5 @@ seaborn==0.13.2
 openai==1.51.2
 statsmodels==0.14.2
 cryptography
+streamlit-authenticator
+pyyaml
