@@ -188,4 +188,11 @@ __pycache__/
 *.pyc
 # Streamlit secrets
 .streamlit/secrets.toml
+.DS_Store
+*.xlsx
+*.csv
+*.db
+*.png
+*.docx
+~$*
 >>>>>>> 8142bd9 (Initial commit of pharmacy claims analyzer with secrets)
