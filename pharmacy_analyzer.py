@@ -8,21 +8,35 @@ import datetime
 import sqlite3
 import numpy as np
 import os
-from statsmodels.tsa.arima.model import ARIMA
+import requests
 import warnings
 
 # Suppress ARIMA convergence warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-# Medication-to-condition mapping
+# Fallback medication-to-condition mapping
 MEDICATION_CONDITIONS = {
     "AMOXICILLIN": ["Bacterial Infections (e.g., strep throat, ear infections)"],
     "DROSPIRENONE/ETHINYL ESTRADIOL": ["Contraception", "Acne", "Premenstrual Syndrome"],
     "TREMFYA": ["Psoriasis", "Psoriatic Arthritis"],
-    # Add more mappings as needed
     "UNKNOWN": ["Unknown Condition"]
 }
+
+# Fetch conditions from openFDA API
+def get_drug_conditions(drug_name):
+    try:
+        url = f"https://api.fda.gov/drug/label.json?search=openfda.brand_name:{drug_name}+OR+openfda.generic_name:{drug_name}&limit=1"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("results"):
+                indications = data["results"][0].get("indications_and_usage", ["No Conditions Found"])
+                return indications if indications else ["No Conditions Found"]
+            return ["Drug Not Found"]
+        return ["API Error"]
+    except:
+        return MEDICATION_CONDITIONS.get(drug_name.upper(), MEDICATION_CONDITIONS["UNKNOWN"])
 
 # Store claims in SQLite database
 def store_claims(df, file_name):
@@ -103,14 +117,12 @@ def analyze_claims(df):
     if id_cols and drug_cols:
         id_col = id_cols[0]
         drug_col = drug_cols[0]
-        # Group by member and collect unique medications
         member_meds = df.groupby(id_col)[drug_col].unique().reset_index()
-        # Map medications to conditions
         member_meds['Conditions'] = member_meds[drug_col].apply(
             lambda drugs: [
                 condition 
                 for drug in drugs 
-                for condition in MEDICATION_CONDITIONS.get(drug.upper(), MEDICATION_CONDITIONS["UNKNOWN"])
+                for condition in get_drug_conditions(drug)
             ]
         )
         results['member_medications'] = member_meds[[id_col, drug_col, 'Conditions']]
