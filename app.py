@@ -21,11 +21,11 @@ authenticator = stauth.Authenticate(
 )
 
 # Authentication
-name, authentication_status, username = authenticator.login(fields={'Form name': 'Login', 'Username': 'Username', 'Password': 'Password', 'Login': 'Login'})
+authentication_status = authenticator.login(location='main')
 
-if authentication_status:
+if authentication_status == 'logged_in':
     authenticator.logout('Logout', 'sidebar')
-    st.write(f'Welcome *{name}*!')
+    st.write(f'Welcome *{st.session_state["name"]}*!')
 
     # Initialize xAI client
     try:
@@ -208,7 +208,7 @@ if authentication_status:
             # Clean up temporary file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-elif authentication_status == False:
+elif authentication_status == 'login_failed':
     st.error('Username/password is incorrect')
-elif authentication_status == None:
+elif authentication_status == 'not_logged_in':
     st.warning('Please enter your username and password')
