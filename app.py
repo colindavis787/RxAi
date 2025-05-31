@@ -13,6 +13,7 @@ from yaml.loader import SafeLoader
 with open('.streamlit/credentials.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
+# Initialize authenticator
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -20,10 +21,11 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-# Authentication
-authentication_status = authenticator.login(location='main')
+# Render login form
+authenticator.login(location='main')
 
-if authentication_status == 'logged_in':
+# Check authentication status
+if st.session_state.get("authentication_status") is True:
     authenticator.logout('Logout', 'sidebar')
     st.write(f'Welcome *{st.session_state["name"]}*!')
 
@@ -208,7 +210,7 @@ if authentication_status == 'logged_in':
             # Clean up temporary file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-elif authentication_status == 'login_failed':
+elif st.session_state.get("authentication_status") is False:
     st.error('Username/password is incorrect')
-elif authentication_status == 'not_logged_in':
+elif st.session_state.get("authentication_status") is None:
     st.warning('Please enter your username and password')
