@@ -1,23 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+import bcrypt
 import subprocess
 import os
 
 app = Flask(__name__)
-app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'  # Replace with a unique, random key
+app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'  # Your secure key
 
 # Load credentials
 with open('.streamlit/credentials.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
+# Extract credentials for verification
+users = config['credentials']['usernames']
 
 @app.route('/')
 def index():
@@ -26,20 +22,15 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].strip()
         password = request.form['password']
-        # Simulate streamlit-authenticator login
-        try:
-            authenticator.login(location='main')
-            if authenticator._check_credentials(username, password):
-                session['authentication_status'] = True
-                session['username'] = username
-                session['name'] = config['credentials']['usernames'][username]['name']
-                return redirect(url_for('dashboard'))
-            else:
-                flash('Invalid username or password', 'error')
-        except:
-            flash('Login error', 'error')
+        if username in users and bcrypt.checkpw(password.encode('utf-8'), users[username]['password'].encode('utf-8')):
+            session['authentication_status'] = True
+            session['username'] = username
+            session['name'] = users[username]['name']
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
     return render_template('login.html')
 
 @app.route('/dashboard')
