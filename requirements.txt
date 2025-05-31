@@ -11,3 +11,4 @@ streamlit-authenticator
 pyyaml
 pyyaml
 pyyaml
+gunicorn
