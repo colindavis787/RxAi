@@ -33,7 +33,7 @@ def get_encryption_key():
 def encrypt_data(data, cipher):
     if isinstance(data, str):
         return cipher.encrypt(data.encode()).decode()
-    return data
+    return str(data)  # Convert non-string data to string
 
 # Decrypt data (for display, if needed)
 def decrypt_data(data, cipher):
@@ -242,9 +242,11 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
             continue
         try:
             y_quantity = member_data[quantity_col].values
-            model = ARIMA(y_quantity, order=(1, 0, 0))
-            model_fit = model.fit()
-            predicted_quantities = model_fit.forecast(steps=3)
+            model = LinearRegression()
+            X = member_data['month_ordinal'].values.reshape(-1, 1)
+            model.fit(X, y_quantity)
+            future_months = np.array([X[-1][0] + i for i in range(1, 4)]).reshape(-1, 1)
+            predicted_quantities = model.predict(future_months)
             predictions[f"{key}_utilization"] = predicted_quantities.tolist()
         except:
             predictions[f"{key}_utilization"] = [0, 0, 0]
@@ -252,9 +254,9 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
         if cost_cols:
             try:
                 y_cost = member_data[cost_cols[0]].values
-                model = ARIMA(y_cost, order=(1, 0, 0))
-                model_fit = model.fit()
-                predicted_costs = model_fit.forecast(steps=3)
+                model = LinearRegression()
+                model.fit(X, y_cost)
+                predicted_costs = model.predict(future_months)
                 predicted_costs *= (1 + inflation_rate / 4)
                 predictions[f"{key}_cost"] = predicted_costs.tolist()
             except:
