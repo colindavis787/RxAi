@@ -5,8 +5,8 @@ import bcrypt
 import subprocess
 import os
 
-app = Flask(__name__)
-app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'  # Your secure key
+app = Flask(__name__, template_folder='templates')
+app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'
 
 # Load credentials
 with open('.streamlit/credentials.yaml') as file:
@@ -17,13 +17,22 @@ users = config['credentials']['usernames']
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        return f"Error rendering homepage: {str(e)}", 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password']
+        if len(username) > 50 or len(password) > 50:
+            flash('Input too long', 'error')
+            return render_template('login.html')
+        if not username or not password:
+            flash('Username and password required', 'error')
+            return render_template('login.html')
         if username in users and bcrypt.checkpw(password.encode('utf-8'), users[username]['password'].encode('utf-8')):
             session['authentication_status'] = True
             session['username'] = username
