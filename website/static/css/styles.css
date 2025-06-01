@@ -1,12 +1,12 @@
 body {
-        font-family: Arial, sans-serif;
-    }
-    .container {
-        max-width: 800px;
-    }
-    .navbar-brand {
-        font-weight: bold;
-    }
-    .alert {
-        margin-bottom: 20px;
-    }
+    font-family: Arial, sans-serif;
+}
+.container {
+    max-width: 800px;
+}
+.navbar-brand {
+    font-weight: bold;
+}
+.alert {
+    margin-bottom: 20px;
+}

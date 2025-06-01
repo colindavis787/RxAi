@@ -1,2 +1,2 @@
 // Add interactivity here if needed
-    console.log("Website loaded");
+console.log("Website loaded");
