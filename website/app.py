@@ -6,6 +6,7 @@ import subprocess
 import os
 import logging
 import webbrowser
+from flask import Response
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,9 +17,11 @@ app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'
 
 # Load credentials
 try:
+    logger.debug("Attempting to load credentials.yaml")
     with open('.streamlit/credentials.yaml') as file:
         config = yaml.load(file, Loader=SafeLoader)
     users = config['credentials']['usernames']
+    logger.debug("Credentials loaded successfully")
 except Exception as e:
     logger.error(f"Failed to load credentials.yaml: {str(e)}")
     users = {}
@@ -26,16 +29,24 @@ except Exception as e:
 @app.route('/')
 def index():
     try:
-        logger.debug("Rendering index.html")
-        return render_template('index.html')
+        logger.debug("Attempting to render index.html")
+        if not os.path.exists('templates/index.html'):
+            logger.error("index.html not found in templates directory")
+            return Response("Template index.html not found", status=500)
+        result = render_template('index.html')
+        logger.debug("Successfully rendered index.html")
+        return result
     except Exception as e:
         logger.error(f"Error rendering homepage: {str(e)}")
-        return f"Error rendering homepage: {str(e)}", 500
+        return Response(f"Error rendering homepage: {str(e)}", status=500)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     try:
         logger.debug("Accessing login route")
+        if not os.path.exists('templates/login.html'):
+            logger.error("login.html not found in templates directory")
+            return Response("Template login.html not found", status=500)
         if request.method == 'POST':
             username = request.form['username'].strip()
             password = request.form['password']
@@ -60,19 +71,22 @@ def login():
         return render_template('login.html')
     except Exception as e:
         logger.error(f"Error in login route: {str(e)}")
-        return f"Error in login: {str(e)}", 500
+        return Response(f"Error in login: {str(e)}", status=500)
 
 @app.route('/dashboard')
 def dashboard():
     try:
         logger.debug("Accessing dashboard route")
+        if not os.path.exists('templates/dashboard.html'):
+            logger.error("dashboard.html not found in templates directory")
+            return Response("Template dashboard.html not found", status=500)
         if session.get('authentication_status'):
             return render_template('dashboard.html', username=session['username'])
         logger.warning("Unauthorized dashboard access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
-        return f"Error in dashboard: {str(e)}", 500
+        return Response(f"Error in dashboard: {str(e)}", status=500)
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -84,7 +98,7 @@ def logout():
         return redirect(url_for('index'))
     except Exception as e:
         logger.error(f"Error in logout route: {str(e)}")
-        return f"Error in logout: {str(e)}", 500
+        return Response(f"Error in logout: {str(e)}", status=500)
 
 @app.route('/streamlit')
 def streamlit_app():
@@ -99,9 +113,10 @@ def streamlit_app():
         return redirect(url_for('login'))
     except Exception as e:
         logger.error(f"Error in streamlit route: {str(e)}")
-        return f"Error in streamlit: {str(e)}", 500
+        return Response(f"Error in streamlit: {str(e)}", status=500)
 
 if __name__ == '__main__':
     # Open browser automatically
+    logger.debug("Starting Flask app")
     webbrowser.open('http://localhost:5000')
     app.run(debug=True, port=5000)
