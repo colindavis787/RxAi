@@ -114,8 +114,8 @@ def streamlit_app():
     try:
         logger.debug("Accessing streamlit route")
         if session.get('authentication_status'):
-            # Redirect to external Streamlit app (to be set up separately)
-            streamlit_url = os.getenv('STREAMLIT_URL', 'https://pharmacy-claims-streamlit-0f4c96d1e50c.herokuapp.com')
+            # Redirect to external Streamlit app
+            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app')
             return redirect(streamlit_url)
         logger.warning("Unauthorized streamlit access, redirecting to login")
         return redirect(url_for('login'))
