@@ -161,6 +161,13 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+website/.streamlit/credentials.yaml
+encryption_key.key
+cleaned_pharmacy_claims.csv
+claims_history.db
+*.pyc
+__pycache__/
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
