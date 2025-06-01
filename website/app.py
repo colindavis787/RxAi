@@ -10,15 +10,17 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = '2f0782073d00457d2c4ed7576e6771c8'
 
 # Load credentials
-with open('.streamlit/credentials.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
-
-# Extract credentials for verification
-users = config['credentials']['usernames']
+try:
+    with open('.streamlit/credentials.yaml') as file:
+        config = yaml.load(file, Loader=SafeLoader)
+    users = config['credentials']['usernames']
+except Exception as e:
+    logger.error(f"Failed to load credentials.yaml: {str(e)}")
+    users = {}
 
 @app.route('/')
 def index():
@@ -65,6 +67,7 @@ def dashboard():
         logger.debug("Accessing dashboard route")
         if session.get('authentication_status'):
             return render_template('dashboard.html', username=session['username'])
+        logger.warning("Unauthorized dashboard access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
@@ -91,6 +94,7 @@ def streamlit_app():
             subprocess.Popen(['streamlit', 'run', '../app.py', '--server.port', '8502'])
             logger.debug("Started Streamlit subprocess")
             return redirect('http://localhost:8502')
+        logger.warning("Unauthorized streamlit access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
         logger.error(f"Error in streamlit route: {str(e)}")
