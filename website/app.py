@@ -114,9 +114,20 @@ def streamlit_app():
     try:
         logger.debug("Accessing streamlit route")
         if session.get('authentication_status'):
-            # Run Streamlit app in a subprocess
-            subprocess.Popen(['streamlit', 'run', '../app.py', '--server.port', '8506'])
-            logger.debug("Started Streamlit subprocess")
+            # Check if port 8506 is free
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            result = sock.connect_ex(('127.0.0.1', 8506))
+            sock.close()
+            if result != 0:  # Port is free
+                # Run Streamlit app in a subprocess
+                subprocess.Popen(['streamlit', 'run', '../app.py', '--server.port', '8506'])
+                logger.debug("Started Streamlit subprocess")
+                # Wait briefly for Streamlit to start
+                import time
+                time.sleep(2)
+            else:
+                logger.warning("Port 8506 is already in use")
             return redirect('http://localhost:8506')
         logger.warning("Unauthorized streamlit access, redirecting to login")
         return redirect(url_for('login'))
