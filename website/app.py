@@ -5,6 +5,7 @@ import bcrypt
 import subprocess
 import os
 import logging
+import webbrowser
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -101,4 +102,6 @@ def streamlit_app():
         return f"Error in streamlit: {str(e)}", 500
 
 if __name__ == '__main__':
+    # Open browser automatically
+    webbrowser.open('http://localhost:5000')
     app.run(debug=True, port=5000)
