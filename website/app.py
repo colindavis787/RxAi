@@ -115,9 +115,9 @@ def streamlit_app():
         logger.debug("Accessing streamlit route")
         if session.get('authentication_status'):
             # Run Streamlit app in a subprocess
-            subprocess.Popen(['streamlit', 'run', '../app.py', '--server.port', '8502'])
+            subprocess.Popen(['streamlit', 'run', '../app.py', '--server.port', '8506'])
             logger.debug("Started Streamlit subprocess")
-            return redirect('http://localhost:8502')
+            return redirect('http://localhost:8506')
         logger.warning("Unauthorized streamlit access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
@@ -126,7 +126,7 @@ def streamlit_app():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run Flask app')
-    parser.add_argument('--port', type=int, default=5000, help='Port to run the app on')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the app on')
     args = parser.parse_args()
     logger.debug(f"Starting Flask app on port {args.port}")
     webbrowser.open(f'http://localhost:{args.port}')
