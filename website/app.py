@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 import yaml
 from yaml.loader import SafeLoader
 import bcrypt
@@ -6,7 +6,7 @@ import subprocess
 import os
 import logging
 import webbrowser
-from flask import Response
+import argparse
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -39,6 +39,15 @@ def index():
     except Exception as e:
         logger.error(f"Error rendering homepage: {str(e)}")
         return Response(f"Error rendering homepage: {str(e)}", status=500)
+
+@app.route('/test')
+def test():
+    try:
+        logger.debug("Accessing test route")
+        return Response("Test route working", status=200)
+    except Exception as e:
+        logger.error(f"Error in test route: {str(e)}")
+        return Response(f"Error in test: {str(e)}", status=500)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -116,7 +125,9 @@ def streamlit_app():
         return Response(f"Error in streamlit: {str(e)}", status=500)
 
 if __name__ == '__main__':
-    # Open browser automatically
-    logger.debug("Starting Flask app")
-    webbrowser.open('http://localhost:5000')
-    app.run(debug=True, port=5000)
+    parser = argparse.ArgumentParser(description='Run Flask app')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run the app on')
+    args = parser.parse_args()
+    logger.debug(f"Starting Flask app on port {args.port}")
+    webbrowser.open(f'http://localhost:{args.port}')
+    app.run(debug=True, port=args.port)
