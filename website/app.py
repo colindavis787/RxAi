@@ -56,31 +56,43 @@ def login():
         if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
             logger.error("login.html not found in templates directory")
             return Response("Template login.html not found", status=500)
+        if not users:
+            logger.error("No users loaded from credentials.yaml")
+            flash('Authentication system is unavailable. Please contact support.', 'error')
+            return render_template('login.html')
         if request.method == 'POST':
-            username = request.form['username'].strip()
-            password = request.form['password']
+            username = request.form.get('username', '').strip()
+            password = request.form.get('password', '')
             logger.debug(f"Login attempt for username: {username}")
-            if len(username) > 50 or len(password) > 50:
-                flash('Input too long', 'error')
-                logger.warning("Login input too long")
-                return render_template('login.html')
             if not username or not password:
-                flash('Username and password required', 'error')
                 logger.warning("Missing username or password")
+                flash('Username and password required', 'error')
                 return render_template('login.html')
-            if username in users and bcrypt.checkpw(password.encode('utf-8'), users[username]['password'].encode('utf-8')):
+            if len(username) > 50 or len(password) > 50:
+                logger.warning("Login input too long")
+                flash('Input too long', 'error')
+                return render_template('login.html')
+            if username not in users:
+                logger.warning(f"Username {username} not found")
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            stored_password = users[username]['password']
+            logger.debug(f"Stored password hash: {stored_password}")
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
                 session['authentication_status'] = True
                 session['username'] = username
                 session['name'] = users[username]['name']
                 logger.info(f"Successful login for {username}")
                 return redirect(url_for('dashboard'))
             else:
+                logger.warning("Invalid password")
                 flash('Invalid username or password', 'error')
-                logger.warning("Invalid login credentials")
+                return render_template('login.html')
         return render_template('login.html')
     except Exception as e:
         logger.error(f"Error in login route: {str(e)}")
-        return Response(f"Error in login: {str(e)}", status=500)
+        flash(f'Login error: {str(e)}', 'error')
+        return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
