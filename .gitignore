@@ -34,3 +34,9 @@ __pycache__/
 committed_pharmacy_analyzer.py
 website_plan.txt.rtf
 requirements.txt~pip
+.streamlit/
+*.xlsx
+*.csv
+*.png
+*.docx
+*.~*~
