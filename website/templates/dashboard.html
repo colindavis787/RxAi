@@ -6,18 +6,30 @@
     <title>Dashboard - Pharmacy Claims Analyzer</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .iframe-container {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-light bg-light">
         <a class="navbar-brand" href="/">Pharmacy Claims Analyzer</a>
-        <form method="POST" action="/logout">
-            <button type="submit" class="btn btn-danger">Logout</button>
+        <form class="form-inline" method="POST" action="/logout">
+            <button class="btn btn-outline-danger my-2 my-sm-0" type="submit">Logout</button>
         </form>
     </nav>
     <div class="container mt-5">
         <h2>Welcome, {{ username }}!</h2>
         <p>Access the Pharmacy Claims Analyzer below:</p>
-        <iframe src="/streamlit" style="width:100%;height:600px;border:none;"></iframe>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-danger">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        <iframe class="iframe-container" src="{{ streamlit_url }}" frameborder="0"></iframe>
     </div>
     <script src="/static/js/script.js"></script>
 </body>
