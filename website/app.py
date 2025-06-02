@@ -102,7 +102,17 @@ def dashboard():
             logger.error("dashboard.html not found in templates directory")
             return Response("Template dashboard.html not found", status=500)
         if session.get('authentication_status'):
-            return render_template('dashboard.html', username=session['username'])
+            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app/?embedded=true')
+            try:
+                import requests
+                response = requests.head(streamlit_url, timeout=5)
+                if response.status_code != 200:
+                    logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
+                    flash('Streamlit app is currently unavailable. Please try again later.', 'error')
+            except requests.RequestException as e:
+                logger.error(f"Failed to reach Streamlit app: {str(e)}")
+                flash('Streamlit app is currently unavailable. Please try again later.', 'error')
+            return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
         logger.warning("Unauthorized dashboard access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
@@ -126,14 +136,14 @@ def streamlit_app():
     try:
         logger.debug("Accessing streamlit route")
         if session.get('authentication_status'):
-            # Redirect to external Streamlit app
-            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app')
+            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app/?embedded=true')
             return redirect(streamlit_url)
         logger.warning("Unauthorized streamlit access, redirecting to login")
         return redirect(url_for('login'))
     except Exception as e:
         logger.error(f"Error in streamlit route: {str(e)}")
-        return Response(f"Error in streamlit: {str(e)}", status=500)
+        flash(f'Streamlit error: {str(e)}', 'error')
+        return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run Flask app')
