@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Claims Analyzer</title>
+    <title>RxAiAnalytics</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .navbar-brand img {
+            height: 40px;
+            width: auto;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-light bg-light">
-        <a class="navbar-brand" href="/">Pharmacy Claims Analyzer</a>
-        <a class="btn btn-primary" href="/login">Login</a>
+        <a class="navbar-brand" href="/">
+            <img src="/static/images/rxai_logo.jpg" alt="RxAiAnalytics Logo">
+        </a>
     </nav>
     <div class="container mt-5">
-        <h1>Welcome to the Pharmacy Claims Analyzer</h1>
-        <p>This tool allows you to securely upload pharmacy claims data, analyze trends, and gain insights. Log in to get started.</p>
+        <h1>RxAiAnalytics</h1>
+        <p>RxAiAnalytics is an advanced AI-powered tool designed for employee benefit consultants to analyze and interpret clients’ claims data. It provides deep insights into plan performance, leveraging AI and machine learning to forecast trends over the coming years. By leveraging our understanding of disease states and drug utilization patterns, RxAiAnalytics empowers consultants with data-driven strategies, optimizing client outcomes and optimizing plan management. Log in and securely upload pharmacy claims data to get started.</p>
+        <a href="/login" class="btn btn-primary">Log In</a>
     </div>
     <script src="/static/js/script.js"></script>
 </body>
