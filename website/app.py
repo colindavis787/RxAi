@@ -6,6 +6,8 @@ import os
 import logging
 import webbrowser
 import argparse
+import jwt
+import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -51,61 +53,63 @@ def test():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    try:
-        logger.debug("Accessing login route")
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
-            logger.error("login.html not found in templates directory")
-            return Response("Template login.html not found", status=500)
-        if not users:
-            logger.error("No users loaded from credentials.yaml")
-            flash('Authentication system is unavailable. Please contact support.', 'error')
+    logger.debug("Accessing login route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
+        logger.error("login.html not found in templates directory")
+        return Response("Template login.html not found", status=500)
+    if not users:
+        logger.error("No users loaded from credentials.yaml")
+        flash('Authentication system is unavailable. Please contact support.', 'error')
+        return render_template('login.html')
+    logger.debug(f"Request method: {request.method}")
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        logger.debug(f"Form data received - Username: {username}, Password: {'[REDACTED]' if password else 'None'}")
+        if not username or not password:
+            logger.warning("Missing username or password")
+            flash('Username and password are required.', 'danger')
+            logger.debug("Rendering login.html due to missing fields")
             return render_template('login.html')
-        if request.method == 'POST':
-            username = request.form.get('username', '').strip()
-            password = request.form.get('password', '')
-            logger.debug(f"Login attempt for username: {username}")
-            if not username or not password:
-                logger.warning("Missing username or password")
-                flash('Username and password required', 'error')
-                return render_template('login.html')
-            if len(username) > 50 or len(password) > 50:
-                logger.warning("Login input too long")
-                flash('Input too long', 'error')
-                return render_template('login.html')
-            if username not in users:
-                logger.warning(f"Username {username} not found")
-                flash('Invalid username or password', 'error')
-                return render_template('login.html')
-            stored_password = users[username]['password']
-            logger.debug(f"Stored password hash: {stored_password}")
+        if len(username) > 50 or len(password) > 50:
+            logger.warning("Login input too long")
+            flash('Input is too long (max 50 characters).', 'danger')
+            logger.debug("Rendering login.html due to input length")
+            return render_template('login.html')
+        if username not in users:
+            logger.warning(f"Username {username} not found")
+            flash('Invalid username or password.', 'danger')
+            logger.debug("Rendering login.html due to invalid username")
+            return render_template('login.html')
+        stored_password = users[username]['password']
+        logger.debug(f"Stored password hash: {stored_password}")
+        try:
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
                 session['authentication_status'] = True
                 session['username'] = username
                 session['name'] = users[username]['name']
-                # Generate a JWT token
-                try:
-                    token = jwt.encode({
-                        'username': username,
-                        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-                    }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
-                    session['token'] = token
-                    logger.info(f"Token generated for {username}: {token}")
-                except Exception as e:
-                    logger.error(f"Failed to generate JWT token: {str(e)}")
-                    flash('Error generating authentication token. Please try again.', 'error')
-                    return render_template('login.html')
-                flash('Login successful! You can now close this tab and return to the dashboard.', 'success')
+                token = jwt.encode({
+                    'username': username,
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+                }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+                session['token'] = token
+                logger.info(f"Token generated for {username}: {token}")
+                flash('Login successful! Welcome to your dashboard.', 'success')
                 logger.info(f"Successful login for {username}")
+                logger.debug(f"Redirecting to dashboard for {username}")
                 return redirect(url_for('dashboard'))
             else:
                 logger.warning("Invalid password")
-                flash('Invalid username or password', 'error')
+                flash('Invalid username or password.', 'danger')
+                logger.debug("Rendering login.html due to invalid password")
                 return render_template('login.html')
-        return render_template('login.html')
-    except Exception as e:
-        logger.error(f"Error in login route: {str(e)}")
-        flash(f'Login error: {str(e)}', 'error')
-        return render_template('login.html')
+        except Exception as e:
+            logger.error(f"Error during login: {str(e)}")
+            flash(f'Login error: {str(e)}', 'danger')
+            logger.debug("Rendering login.html due to login exception")
+            return render_template('login.html')
+    logger.debug("Rendering login.html for GET request")
+    return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -164,61 +168,45 @@ def streamlit_app():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    try:
-        logger.debug("Accessing register route")
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'register.html')):
-            logger.error("register.html not found in templates directory")
-            return Response("Template register.html not found", status=500)
-        if request.method == 'POST':
-            name = request.form.get('name', '').strip()
-            username = request.form.get('username', '').strip()
-            password = request.form.get('password', '')
-            logger.debug(f"Registration attempt for username: {username}")
-            if not name or not username or not password:
-                logger.warning("Missing registration fields")
-                flash('All fields are required', 'error')
-                return render_template('register.html')
-            if len(name) > 50 or len(username) > 50 or len(password) > 50:
-                logger.warning("Registration input too long")
-                flash('Input too long', 'error')
-                return render_template('register.html')
-            if username in users:
-                logger.warning(f"Username {username} already exists")
-                flash('Username already exists', 'error')
-                return render_template('register.html')
-            # Hash the password
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            # Update the users dictionary
-            users[username] = {
-                'name': name,
-                'password': hashed_password
-            }
-            # Save updated users to credentials.yaml
-            config['credentials']['usernames'] = users
-            try:
-                with open(credentials_path, 'w') as file:
-                    yaml.dump(config, file)
-                logger.info(f"Successfully registered user: {username}")
-                flash('Registration successful! Please log in.', 'success')
-                return redirect(url_for('login'))
-            except Exception as e:
-                logger.error(f"Failed to save credentials.yaml: {str(e)}")
-                flash('Registration failed. Please try again.', 'error')
-                return render_template('register.html')
-        return render_template('register.html')
-    except Exception as e:
-        logger.error(f"Error in register route: {str(e)}")
-        flash(f'Registration error: {str(e)}', 'error')
-        return render_template('register.html')
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run Flask app')
-    # ... (rest of the file remains unchanged)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run Flask app')
-    parser.add_argument('--port', type=int, default=5001, help='Port to run the app on')
-    args = parser.parse_args()
-    logger.debug(f"Starting Flask app on port {args.port}")
-    webbrowser.open(f'http://localhost:{args.port}')
-    app.run(debug=True, port=args.port)
+    logger.debug("Accessing register route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'register.html')):
+        logger.error("register.html not found in templates directory")
+        return Response("Template register.html not found", status=500)
+    logger.debug(f"Request method: {request.method}")
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        logger.debug(f"Form data received - Name: {name}, Username: {username}, Password: {'[REDACTED]' if password else 'None'}")
+        if not name or not username or not password:
+            logger.warning("Missing registration fields")
+            flash('All fields are required.', 'danger')
+            logger.debug("Rendering register.html due to missing fields")
+            return render_template('register.html')
+        if len(name) > 50 or len(username) > 50 or len(password) > 50:
+            logger.warning("Registration input too long")
+            flash('Input is too long (max 50 characters).', 'danger')
+            logger.debug("Rendering register.html due to input length")
+            return render_template('register.html')
+        if username in users:
+            logger.warning(f"Username {username} already exists")
+            flash('Username already exists.', 'danger')
+            logger.debug("Rendering register.html due to existing username")
+            return render_template('register.html')
+        # Hash the password
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        # Update the users dictionary
+        users[username] = {
+            'name': name,
+            'password': hashed_password
+        }
+        # Save updated users to credentials.yaml
+        config['credentials']['usernames'] = users
+        with open(credentials_path, 'w') as file:
+            yaml.dump(config, file)
+        logger.info(f"Successfully registered user: {username}")
+        flash('Registration successful! Please log in.', 'success')
+        logger.debug(f"Redirecting to login for {username}")
+        return redirect(url_for('login'))
+    logger.debug("Rendering register.html for GET request")
+    return render_template('register.html')
