@@ -82,6 +82,19 @@ def login():
                 session['authentication_status'] = True
                 session['username'] = username
                 session['name'] = users[username]['name']
+                # Generate a JWT token
+                try:
+                    token = jwt.encode({
+                        'username': username,
+                        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+                    }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+                    session['token'] = token
+                    logger.info(f"Token generated for {username}: {token}")
+                except Exception as e:
+                    logger.error(f"Failed to generate JWT token: {str(e)}")
+                    flash('Error generating authentication token. Please try again.', 'error')
+                    return render_template('login.html')
+                flash('Login successful! You can now close this tab and return to the dashboard.', 'success')
                 logger.info(f"Successful login for {username}")
                 return redirect(url_for('dashboard'))
             else:
@@ -101,20 +114,24 @@ def dashboard():
         if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')):
             logger.error("dashboard.html not found in templates directory")
             return Response("Template dashboard.html not found", status=500)
-        if session.get('authentication_status'):
-            streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session['username']}&token={session['token']}")
-            try:
-                import requests
-                response = requests.head(streamlit_url, timeout=5)
-                if response.status_code != 200:
-                    logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
-                    flash('Streamlit app is currently unavailable. Please try again later.', 'error')
-            except requests.RequestException as e:
-                logger.error(f"Failed to reach Streamlit app: {str(e)}")
+        if not session.get('authentication_status'):
+            logger.warning("Unauthorized dashboard access, redirecting to login")
+            return redirect(url_for('login'))
+        if not session.get('username') or not session.get('token'):
+            logger.error("Missing username or token in session, redirecting to login")
+            flash('Session expired or invalid. Please log in again.', 'error')
+            return redirect(url_for('login'))
+        streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session['username']}&token={session['token']}")
+        try:
+            import requests
+            response = requests.head(streamlit_url, timeout=5)
+            if response.status_code != 200:
+                logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
                 flash('Streamlit app is currently unavailable. Please try again later.', 'error')
-            return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
-        logger.warning("Unauthorized dashboard access, redirecting to login")
-        return redirect(url_for('login'))
+        except requests.RequestException as e:
+            logger.error(f"Failed to reach Streamlit app: {str(e)}")
+            flash('Streamlit app is currently unavailable. Please try again later.', 'error')
+        return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
         return Response(f"Error in dashboard: {str(e)}", status=500)
