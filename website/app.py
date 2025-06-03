@@ -145,6 +145,59 @@ def streamlit_app():
         flash(f'Streamlit error: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    try:
+        logger.debug("Accessing register route")
+        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'register.html')):
+            logger.error("register.html not found in templates directory")
+            return Response("Template register.html not found", status=500)
+        if request.method == 'POST':
+            name = request.form.get('name', '').strip()
+            username = request.form.get('username', '').strip()
+            password = request.form.get('password', '')
+            logger.debug(f"Registration attempt for username: {username}")
+            if not name or not username or not password:
+                logger.warning("Missing registration fields")
+                flash('All fields are required', 'error')
+                return render_template('register.html')
+            if len(name) > 50 or len(username) > 50 or len(password) > 50:
+                logger.warning("Registration input too long")
+                flash('Input too long', 'error')
+                return render_template('register.html')
+            if username in users:
+                logger.warning(f"Username {username} already exists")
+                flash('Username already exists', 'error')
+                return render_template('register.html')
+            # Hash the password
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            # Update the users dictionary
+            users[username] = {
+                'name': name,
+                'password': hashed_password
+            }
+            # Save updated users to credentials.yaml
+            config['credentials']['usernames'] = users
+            try:
+                with open(credentials_path, 'w') as file:
+                    yaml.dump(config, file)
+                logger.info(f"Successfully registered user: {username}")
+                flash('Registration successful! Please log in.', 'success')
+                return redirect(url_for('login'))
+            except Exception as e:
+                logger.error(f"Failed to save credentials.yaml: {str(e)}")
+                flash('Registration failed. Please try again.', 'error')
+                return render_template('register.html')
+        return render_template('register.html')
+    except Exception as e:
+        logger.error(f"Error in register route: {str(e)}")
+        flash(f'Registration error: {str(e)}', 'error')
+        return render_template('register.html')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run Flask app')
+    # ... (rest of the file remains unchanged)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run Flask app')
     parser.add_argument('--port', type=int, default=5001, help='Port to run the app on')
