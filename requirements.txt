@@ -9,3 +9,4 @@ pyyaml
 bcrypt
 requests
 cryptography
+pyjwt
