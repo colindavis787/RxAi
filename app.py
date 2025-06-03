@@ -242,20 +242,10 @@ else:
     st.error("Please log in via the website to access the dashboard.")
     st.markdown(
         """
-        <a href="https://rxaianalytics.com/login" target="_top" style="color: #1f77b4; text-decoration: underline;">
-            Log In Here
+        <a href="https://rxaianalytics.com/login" target="_blank" style="color: #1f77b4; text-decoration: underline;">
+            Log In Here (Opens in a New Tab)
         </a>
         """,
         unsafe_allow_html=True
     )
-    # Also add a JavaScript redirect to ensure the top-level window navigates
-    st.markdown(
-        """
-        <script>
-            if (window.top !== window.self) {
-                window.top.location.href = "https://rxaianalytics.com/login";
-            }
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
+    st.write("After logging in, return to this tab and refresh the page to access the dashboard.")
