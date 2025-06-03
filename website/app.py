@@ -102,7 +102,7 @@ def dashboard():
             logger.error("dashboard.html not found in templates directory")
             return Response("Template dashboard.html not found", status=500)
         if session.get('authentication_status'):
-            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app/?embedded=true')
+            streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session['username']}&token={session['token']}")
             try:
                 import requests
                 response = requests.head(streamlit_url, timeout=5)
