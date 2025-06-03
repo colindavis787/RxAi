@@ -240,4 +240,22 @@ if st.session_state.authenticated:
                 os.remove(temp_file)
 else:
     st.error("Please log in via the website to access the dashboard.")
-    st.markdown("[Log In Here](https://rxaianalytics.com/login)")
+    st.markdown(
+        """
+        <a href="https://rxaianalytics.com/login" target="_top" style="color: #1f77b4; text-decoration: underline;">
+            Log In Here
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+    # Also add a JavaScript redirect to ensure the top-level window navigates
+    st.markdown(
+        """
+        <script>
+            if (window.top !== window.self) {
+                window.top.location.href = "https://rxaianalytics.com/login";
+            }
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
