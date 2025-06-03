@@ -40,3 +40,4 @@ requirements.txt~pip
 *.png
 *.docx
 *.~*~
+website/heroku_logs.txt
