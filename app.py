@@ -12,7 +12,7 @@ import datetime
 from pathlib import Path
 
 # JWT secret key (will be updated later with the same key used in Flask)
-JWT_SECRET_KEY = 'your_jwt_secret_key_here'  # Replace with a secure key in production
+JWT_SECRET_KEY = 'your_jwt_secret_key_12345'  # Replace with a secure key in production
 
 # Load user credentials
 credentials_path = Path('.streamlit/credentials.yaml')
