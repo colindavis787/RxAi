@@ -16,17 +16,25 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 
-# Load credentials
-try:
-    logger.debug("Attempting to load credentials.yaml")
-    credentials_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'credentials.yaml')
-    with open(credentials_path) as file:
-        config = yaml.load(file, Loader=SafeLoader)
-    users = config['credentials']['usernames']
-    logger.debug("Credentials loaded successfully")
-except Exception as e:
-    logger.error(f"Failed to load credentials.yaml: {str(e)}")
-    users = {}
+# Global variables
+credentials_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'credentials.yaml')
+config = None
+users = {}
+
+def load_credentials():
+    global config, users
+    try:
+        logger.debug("Attempting to load credentials.yaml")
+        with open(credentials_path) as file:
+            config = yaml.load(file, Loader=SafeLoader)
+        users = config['credentials']['usernames']
+        logger.debug("Credentials loaded successfully")
+    except Exception as e:
+        logger.error(f"Failed to load credentials.yaml: {str(e)}")
+        users = {}
+
+# Load credentials at startup
+load_credentials()
 
 @app.route('/')
 def index():
@@ -205,6 +213,7 @@ def register():
         with open(credentials_path, 'w') as file:
             yaml.dump(config, file)
         logger.info(f"Successfully registered user: {username}")
+        load_credentials()  # Reload users after saving
         flash('Registration successful! Please log in.', 'success')
         logger.debug(f"Redirecting to login for {username}")
         return redirect(url_for('login'))
