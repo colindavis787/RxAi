@@ -5,29 +5,61 @@ from openai import OpenAI
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
-import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+import jwt
+import datetime
+from pathlib import Path
+
+# JWT secret key (will be updated later with the same key used in Flask)
+JWT_SECRET_KEY = 'your_jwt_secret_key_here'  # Replace with a secure key in production
 
 # Load user credentials
-with open('.streamlit/credentials.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
+credentials_path = Path('.streamlit/credentials.yaml')
+try:
+    with open(credentials_path) as file:
+        config = yaml.load(file, Loader=SafeLoader)
+    users = config['credentials']['usernames']
+except Exception as e:
+    st.error(f"Failed to load credentials: {e}")
+    users = {}
 
-# Initialize authenticator
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
+# Initialize session state for authentication and chat history
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'name' not in st.session_state:
+    st.session_state.name = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
-# Render login form
-authenticator.login(location='main')
+# Get username and token from URL parameters
+params = st.query_params
+username = params.get('username', [None])[0]
+token = params.get('token', [None])[0]
 
-# Check authentication status
-if st.session_state.get("authentication_status") is True:
-    authenticator.logout('Logout', 'sidebar')
+# Authenticate user if token is present
+if username and token and not st.session_state.authenticated:
+    try:
+        # Decode and validate the token
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+        if payload['username'] == username and username in users:
+            st.session_state.authenticated = True
+            st.session_state.username = username
+            st.session_state.name = users[username]['name']
+        else:
+            st.error("Invalid authentication token.")
+    except jwt.ExpiredSignatureError:
+        st.error("Authentication token has expired. Please log in again.")
+    except jwt.InvalidTokenError:
+        st.error("Invalid authentication token.")
+
+# Display the app if authenticated
+if st.session_state.authenticated:
+    # Display welcome message and logout link
     st.write(f'Welcome *{st.session_state["name"]}*!')
+    st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
     # Initialize xAI client
     try:
@@ -38,10 +70,6 @@ if st.session_state.get("authentication_status") is True:
     except Exception as e:
         st.error(f"Error initializing AI client: {str(e)}. Please check XAI_API_KEY.")
         client = None
-
-    # Initialize session state for chat history
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
 
     # Set page title
     st.title("Pharmacy Claims Analyzer")
@@ -74,41 +102,41 @@ if st.session_state.get("authentication_status") is True:
             temp_file = "temp.xlsx"
             with open(temp_file, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            
+
             # Run analysis with inflation rate
             cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
-            
+
             # Display messages
             st.write("### Status")
             st.write(messages)
-            
+
             if cleaned_df is not None:
                 # Display analysis results
                 if 'numeric_summary' in analysis_results:
                     st.write("### Numeric Column Summary")
                     st.dataframe(analysis_results['numeric_summary'])
-                
+
                 for key, value in analysis_results.items():
                     if key.endswith('_counts'):
                         st.write(f"### {key.replace('_counts', '')} Distribution")
                         st.dataframe(value.reset_index(name='Count'))
-                    
+
                     elif key == 'claims_per_id':
                         st.write("### Claims per ID")
                         st.dataframe(value)
-                    
+
                     elif key == 'cost_summary':
                         st.write("### Total Cost per ID")
                         st.dataframe(value)
-                    
+
                     elif key == 'member_medications':
                         st.write("### Medications and Likely Conditions per Member")
                         st.dataframe(value)
-            
+
                 # Display anomalies
                 st.write("### Detected Anomalies")
                 st.dataframe(anomalies)
-                
+
                 # Display predictions
                 st.write("### Future Utilization and Cost Predictions (Next 3 Months)")
                 if predictions:
@@ -121,7 +149,7 @@ if st.session_state.get("authentication_status") is True:
                             member = key.replace('_cost', '')
                             st.write(f"**Member {member} Predicted Cost (with {inflation_rate*100}% annual inflation):**")
                             st.write(f"Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}")
-                    
+
                     # Plot predictions
                     plt.figure(figsize=(10, 6))
                     for key, value in predictions.items():
@@ -140,12 +168,12 @@ if st.session_state.get("authentication_status") is True:
                     st.image('prediction_plot.png', caption='Prediction Plot')
                 else:
                     st.write("No predictions available. Ensure ID, date, and quantity columns exist.")
-            
+
                 # Display charts
                 st.write("### Visualizations")
                 for chart in chart_files:
                     st.image(chart, caption=chart.replace('.png', ''))
-                
+
                 # Prepare data context for AI
                 context = ""
                 if 'numeric_summary' in analysis_results:
@@ -169,11 +197,11 @@ if st.session_state.get("authentication_status") is True:
                     elif key.endswith('_cost'):
                         member = key.replace('_cost', '')
                         context += f"Member {member} Cost: Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}\n"
-                
+
                 # Q&A Section
                 st.write("### Ask a Question About the Data")
                 user_question = st.text_input("Enter your question (e.g., 'What condition is Member 9’s medication treating?' or 'How many claims per ID?')")
-                
+
                 if user_question:
                     if not user_question.strip():
                         st.warning("Please enter a valid question.")
@@ -195,22 +223,21 @@ if st.session_state.get("authentication_status") is True:
                             st.error(f"Error getting AI response: {str(e)}")
                     else:
                         st.error("AI client not initialized. Check XAI_API_KEY.")
-                
+
                 # Display chat history
                 if st.session_state.chat_history:
                     st.write("### Chat History")
                     for q, a in st.session_state.chat_history:
                         st.write(f"**Q**: {q}\n**A**: {a}")
-                
+
                 # Clear chat history button
                 if st.button("Clear Chat History"):
                     st.session_state.chat_history = []
                     st.rerun()
-            
+
             # Clean up temporary file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-elif st.session_state.get("authentication_status") is False:
-    st.error('Username/password is incorrect')
-elif st.session_state.get("authentication_status") is None:
-    st.warning('Please enter your username and password')
+else:
+    st.error("Please log in via the website to access the dashboard.")
+    st.markdown("[Log In Here](https://rxaianalytics.com/login)")
