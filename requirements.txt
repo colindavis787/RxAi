@@ -7,3 +7,5 @@ scikit-learn
 openai
 pyyaml
 bcrypt
+requests
+cryptography
