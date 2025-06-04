@@ -1,216 +1,217 @@
-import streamlit as st
-import os
-from pharmacy_analyzer import main
-from openai import OpenAI
-import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 import sqlite3
-import matplotlib.pyplot as plt
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
+import bcrypt
+import os
+import logging
+import webbrowser
+import argparse
+import jwt
+import datetime
 
-# Load user credentials
-with open('.streamlit/credentials.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-# Initialize authenticator
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
+app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
-# Render login form
-authenticator.login(location='main')
+# Database path
+db_path = os.path.join(os.path.dirname(__file__), 'users.db')
 
-# Check authentication status
-if st.session_state.get("authentication_status") is True:
-    authenticator.logout('Logout', 'sidebar')
-    st.write(f'Welcome *{st.session_state["name"]}*!')
-
-    # Initialize xAI client
+def get_db_connection():
     try:
-        client = OpenAI(
-            api_key=os.getenv("XAI_API_KEY") or st.secrets.get("XAI_API_KEY"),
-            base_url="https://api.x.ai/v1"
-        )
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
     except Exception as e:
-        st.error(f"Error initializing AI client: {str(e)}. Please check XAI_API_KEY.")
-        client = None
+        logger.error(f"Failed to connect to database: {str(e)}")
+        raise
 
-    # Initialize session state for chat history
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Set page title
-    st.title("Pharmacy Claims Analyzer")
-
-    # Display historical uploads
-    st.write("### Past Uploads")
+def load_users():
     try:
-        conn = sqlite3.connect('claims_history.db')
-        past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, name, password FROM users")
+        users = {row['username']: {'name': row['name'], 'password': row['password']} for row in cursor.fetchall()}
         conn.close()
-        if not past_uploads.empty:
-            st.dataframe(past_uploads)
-        else:
-            st.write("No past uploads found.")
+        logger.debug(f"Loaded users from database: {list(users.keys())}")
+        return users
     except Exception as e:
-        st.error(f"Error accessing historical data: {str(e)}")
+        logger.error(f"Failed to load users from database: {str(e)}")
+        return {}
 
-    # Inflation rate slider
-    inflation_rate = st.slider("Annual Drug Price Inflation (%)", 0.0, 10.0, 5.0) / 100
+@app.route('/')
+def index():
+    try:
+        logger.debug("Attempting to render index.html")
+        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'index.html')):
+            logger.error("index.html not found in templates directory")
+            return Response("Template index.html not found", status=500)
+        result = render_template('index.html')
+        logger.debug("Successfully rendered index.html")
+        return result
+    except Exception as e:
+        logger.error(f"Error rendering homepage: {str(e)}")
+        return Response(f"Error rendering homepage: {str(e)}", status=500)
 
-    # File uploader
-    uploaded_file = st.file_uploader("Upload Excel file", type="xlsx")
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    logger.debug("Accessing login route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
+        logger.error("login.html not found in templates directory")
+        return Response("Template login.html not found", status=500)
+    users = load_users()
+    if not users:
+        logger.error("No users loaded from database")
+        flash('Authentication system is unavailable. Please contact support.', 'danger')
+        return render_template('login.html')
+    logger.debug(f"Request method: {request.method}")
+    if request.method == 'POST':
+        logger.debug("Received POST request for login")
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        logger.debug(f"Form data received - Username: {username}, Password: {'[REDACTED]' if password else 'None'}")
+        if not username or not password:
+            logger.warning("Missing username or password")
+            flash('Username and password are required.', 'danger')
+            logger.debug("Rendering login.html due to missing fields")
+            return render_template('login.html')
+        if len(username) > 50 or len(password) > 50:
+            logger.warning("Login input too long")
+            flash('Input is too long (max 50 characters).', 'danger')
+            logger.debug("Rendering login.html due to input length")
+            return render_template('login.html')
+        if username not in users:
+            logger.warning(f"Username {username} not found")
+            flash('Invalid username or password.', 'danger')
+            logger.debug("Rendering login.html due to invalid username")
+            return render_template('login.html')
+        stored_password = users[username]['password']
+        logger.debug(f"Stored password hash: {stored_password}")
+        try:
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                session['authentication_status'] = True
+                session['username'] = username
+                session['name'] = users[username]['name']
+                token = jwt.encode({
+                    'username': username,
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+                }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+                # Ensure token is a string
+                token = token.decode('utf-8') if isinstance(token, bytes) else token
+                session['token'] = token
+                logger.info(f"Token generated for {username}: {token}")
+                flash('Login successful! Welcome to your dashboard.', 'success')
+                logger.info(f"Successful login for {username}")
+                logger.debug(f"Redirecting to dashboard for {username}")
+                return redirect(url_for('dashboard'))
+            else:
+                logger.warning("Invalid password")
+                flash('Invalid username or password.', 'danger')
+                logger.debug("Rendering login.html due to invalid password")
+                return render_template('login.html')
+        except Exception as e:
+            logger.error(f"Error during login: {str(e)}")
+            flash(f'Login error: {str(e)}', 'danger')
+            logger.debug("Rendering login.html due to login exception")
+            return render_template('login.html')
+    logger.debug("Rendering login.html for GET request")
+    return render_template('login.html')
 
-    if uploaded_file:
-        # Validate file size (limit to 10MB)
-        if len(uploaded_file.getvalue()) > 10 * 1024 * 1024:
-            st.error("File size exceeds 10MB limit.")
-        else:
-            # Save uploaded file temporarily
-            temp_file = "temp.xlsx"
-            with open(temp_file, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Run analysis with inflation rate
-            cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
-            
-            # Display messages
-            st.write("### Status")
-            st.write(messages)
-            
-            if cleaned_df is not None:
-                # Display analysis results
-                if 'numeric_summary' in analysis_results:
-                    st.write("### Numeric Column Summary")
-                    st.dataframe(analysis_results['numeric_summary'])
-                
-                for key, value in analysis_results.items():
-                    if key.endswith('_counts'):
-                        st.write(f"### {key.replace('_counts', '')} Distribution")
-                        st.dataframe(value.reset_index(name='Count'))
-                    
-                    elif key == 'claims_per_id':
-                        st.write("### Claims per ID")
-                        st.dataframe(value)
-                    
-                    elif key == 'cost_summary':
-                        st.write("### Total Cost per ID")
-                        st.dataframe(value)
-                    
-                    elif key == 'member_medications':
-                        st.write("### Medications and Likely Conditions per Member")
-                        st.dataframe(value)
-            
-                # Display anomalies
-                st.write("### Detected Anomalies")
-                st.dataframe(anomalies)
-                
-                # Display predictions
-                st.write("### Future Utilization and Cost Predictions (Next 3 Months)")
-                if predictions:
-                    for key, value in predictions.items():
-                        if key.endswith('_utilization'):
-                            member = key.replace('_utilization', '')
-                            st.write(f"**Member {member} Predicted Utilization (Claims):**")
-                            st.write(f"Month 1: {value[0]:.2f}, Month 2: {value[1]:.2f}, Month 3: {value[2]:.2f}")
-                        elif key.endswith('_cost'):
-                            member = key.replace('_cost', '')
-                            st.write(f"**Member {member} Predicted Cost (with {inflation_rate*100}% annual inflation):**")
-                            st.write(f"Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}")
-                    
-                    # Plot predictions
-                    plt.figure(figsize=(10, 6))
-                    for key, value in predictions.items():
-                        if key.endswith('_utilization'):
-                            member = key.replace('_utilization', '')
-                            plt.plot([1, 2, 3], value, label=f"Member {member} Utilization")
-                        elif key.endswith('_cost'):
-                            member = key.replace('_cost', '')
-                            plt.plot([1, 2, 3], value, '--', label=f"Member {member} Cost ($)")
-                    plt.title('Predicted Utilization and Cost (Next 3 Months)')
-                    plt.xlabel('Month')
-                    plt.ylabel('Value')
-                    plt.legend()
-                    plt.savefig('prediction_plot.png')
-                    plt.close()
-                    st.image('prediction_plot.png', caption='Prediction Plot')
-                else:
-                    st.write("No predictions available. Ensure ID, date, and quantity columns exist.")
-            
-                # Display charts
-                st.write("### Visualizations")
-                for chart in chart_files:
-                    st.image(chart, caption=chart.replace('.png', ''))
-                
-                # Prepare data context for AI
-                context = ""
-                if 'numeric_summary' in analysis_results:
-                    context += "Numeric Column Summary:\n" + analysis_results['numeric_summary'].to_string() + "\n\n"
-                for key, value in analysis_results.items():
-                    if key.endswith('_counts'):
-                        context += f"{key.replace('_counts', '')} Distribution:\n" + value.to_string() + "\n\n"
-                    elif key == 'claims_per_id':
-                        context += "Claims per ID:\n" + value.to_string(index=False) + "\n\n"
-                    elif key == 'cost_summary':
-                        context += "Total Cost per ID:\n" + value.to_string(index=False) + "\n\n"
-                    elif key == 'member_medications':
-                        context += "Medications and Conditions per Member:\n" + value.to_string(index=False) + "\n\n"
-                context += "Raw Data Sample (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
-                context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
-                context += "Predictions (Next 3 Months):\n"
-                for key, value in predictions.items():
-                    if key.endswith('_utilization'):
-                        member = key.replace('_utilization', '')
-                        context += f"Member {member} Utilization: Month 1: {value[0]:.2f}, Month 2: {value[1]:.2f}, Month 3: {value[2]:.2f}\n"
-                    elif key.endswith('_cost'):
-                        member = key.replace('_cost', '')
-                        context += f"Member {member} Cost: Month 1: ${value[0]:.2f}, Month 2: ${value[1]:.2f}, Month 3: ${value[2]:.2f}\n"
-                
-                # Q&A Section
-                st.write("### Ask a Question About the Data")
-                user_question = st.text_input("Enter your question (e.g., 'What condition is Member 9’s medication treating?' or 'How many claims per ID?')")
-                
-                if user_question:
-                    if not user_question.strip():
-                        st.warning("Please enter a valid question.")
-                    elif client:
-                        try:
-                            response = client.chat.completions.create(
-                                model="grok-3",
-                                messages=[
-                                    {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns, predictions, and medication conditions. Be concise and accurate."},
-                                    {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
-                                ],
-                                max_tokens=300
-                            )
-                            answer = response.choices[0].message.content.strip()
-                            st.session_state.chat_history.append((user_question, answer))
-                            st.write("**Answer**")
-                            st.write(answer)
-                        except Exception as e:
-                            st.error(f"Error getting AI response: {str(e)}")
-                    else:
-                        st.error("AI client not initialized. Check XAI_API_KEY.")
-                
-                # Display chat history
-                if st.session_state.chat_history:
-                    st.write("### Chat History")
-                    for q, a in st.session_state.chat_history:
-                        st.write(f"**Q**: {q}\n**A**: {a}")
-                
-                # Clear chat history button
-                if st.button("Clear Chat History"):
-                    st.session_state.chat_history = []
-                    st.rerun()
-            
-            # Clean up temporary file
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-elif st.session_state.get("authentication_status") is False:
-    st.error('Username/password is incorrect')
-elif st.session_state.get("authentication_status") is None:
-    st.warning('Please enter your username and password')
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    logger.debug("Accessing register route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'register.html')):
+        logger.error("register.html not found in templates directory")
+        return Response("Template register.html not found", status=500)
+    logger.debug(f"Request method: {request.method}")
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        logger.debug(f"Form data received - Name: {name}, Username: {username}, Password: {'[REDACTED]' if password else 'None'}")
+        if not name or not username or not password:
+            logger.warning("Missing registration fields")
+            flash('All fields are required.', 'danger')
+            logger.debug("Rendering register.html due to missing fields")
+            return render_template('register.html')
+        if len(name) > 50 or len(username) > 50 or len(password) > 50:
+            logger.warning("Registration input too long")
+            flash('Input is too long (max 50 characters).', 'danger')
+            logger.debug("Rendering register.html due to input length")
+            return render_template('register.html')
+        users = load_users()
+        if username in users:
+            logger.warning(f"Username {username} already exists")
+            flash('Username already exists.', 'danger')
+            logger.debug("Rendering register.html due to existing username")
+            return render_template('register.html')
+        # Hash the password
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        # Insert the new user into the database
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO users (username, name, password) VALUES (?, ?, ?)', 
+                           (username, name, hashed_password))
+            conn.commit()
+            logger.info(f"Successfully registered user: {username}")
+            flash('Registration successful! Please log in.', 'success')
+            logger.debug(f"Redirecting to login for {username}")
+        except Exception as e:
+            logger.error(f"Failed to register user: {str(e)}")
+            flash('Registration failed. Please try again.', 'danger')
+            logger.debug("Rendering register.html due to registration failure")
+        finally:
+            conn.close()
+        return redirect(url_for('login'))
+    logger.debug("Rendering register.html for GET request")
+    return render_template('register.html')
+
+@app.route('/dashboard')
+def dashboard():
+    logger.debug("Accessing dashboard route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')):
+        logger.error("dashboard.html not found in templates directory")
+        return Response("Template dashboard.html not found", status=500)
+    if not session.get('authentication_status'):
+        logger.warning("Unauthorized dashboard access, redirecting to login")
+        return redirect(url_for('login'))
+    if not session.get('username') or not session.get('token'):
+        logger.error("Missing username or token in session, redirecting to login")
+        flash('Session expired or invalid. Please log in again.', 'danger')
+        return redirect(url_for('login'))
+    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={session.get('token', '')}")
+    logger.debug(f"Streamlit URL: {streamlit_url}")
+    try:
+        import requests
+        response = requests.head(streamlit_url, timeout=5)
+        if response.status_code != 200:
+            logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
+            flash('Streamlit app is currently unavailable. Please try again later.', 'danger')
+    except requests.RequestException as e:
+        logger.error(f"Failed to reach Streamlit app: {str(e)}")
+        flash('Streamlit app is currently unavailable. Please try again later.', 'danger')
+    return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    try:
+        logger.debug("Accessing logout route")
+        session.clear()
+        logger.info("User logged out successfully")
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error during logout: {str(e)}")
+        return Response(f"Error during logout: {str(e)}", status=500)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run the Flask app with specified port and host.')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the Flask app on (default: 5001)')
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the Flask app on (default: 127.0.0.1)')
+    parser.add_argument('--open-browser', action='store_true', help='Automatically open the browser after starting the server')
+    args = parser.parse_args()
+    if args.open_browser:
+        webbrowser.open_new(f"http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=True)
