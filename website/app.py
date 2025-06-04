@@ -136,7 +136,8 @@ def login():
                 }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
                 # Ensure token is a string
                 token = token.decode('utf-8') if isinstance(token, bytes) else token
-                session['token'] = token
+                logger.debug(f"Generated token: {token}")  # Add this line
+		session['token'] = token
                 logger.info(f"Token generated for {username}: {token}")
                 flash('Login successful! Welcome to your dashboard.', 'success')
                 logger.info(f"Successful login for {username}")
