@@ -10,6 +10,8 @@ from yaml.loader import SafeLoader
 import jwt
 import datetime
 from pathlib import Path
+import logging
+logger = logging.getLogger(__name__)
 
 # JWT secret key (will be updated later with the same key used in Flask)
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
@@ -42,18 +44,21 @@ token = params.get('token', [None])[0]
 # Authenticate user if token is present
 if username and token and not st.session_state.authenticated:
     try:
-        # Decode and validate the token
+        logger.debug(f"Decoding token for username: {username}, token: {token}")
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
         if payload['username'] == username and username in users:
             st.session_state.authenticated = True
             st.session_state.username = username
             st.session_state.name = users[username]['name']
         else:
+            logger.warning("Token username mismatch or user not found")
             st.error("Invalid authentication token.")
-    except jwt.ExpiredSignatureError:
-        st.error("Authentication token has expired. Please log in again.")
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        logger.error(f"Invalid token error: {str(e)}")
         st.error("Invalid authentication token.")
+    except jwt.ExpiredSignatureError:
+        logger.error("Token has expired")
+        st.error("Authentication token has expired. Please log in again.")
 
 # Display the app if authenticated
 if st.session_state.authenticated:
