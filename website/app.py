@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
-import psycopg2
-import psycopg2.extras
+import psycopg
 import bcrypt
 import os
 import logging
@@ -22,7 +21,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_
 def get_db_connection():
     try:
         url = urlparse.urlparse(os.getenv('DATABASE_URL'))
-        db_params = {
+        conninfo = {
             'dbname': url.path[1:],
             'user': url.username,
             'password': url.password,
@@ -31,8 +30,7 @@ def get_db_connection():
             'sslmode': 'require'
         }
         logger.debug("Connecting to Postgres database")
-        conn = psycopg2.connect(**db_params)
-        conn.cursor_factory = psycopg2.extras.DictCursor
+        conn = psycopg.connect(**conninfo)
         logger.debug("Database connection successful")
         return conn
     except Exception as e:
@@ -43,20 +41,19 @@ def get_db_connection():
 def init_db():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                password TEXT NOT NULL
-            )
-        ''')
+        with conn.cursor() as cursor:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    password TEXT NOT NULL
+                )
+            ''')
         conn.commit()
         logger.debug("Database schema initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize database schema: {str(e)}")
     finally:
-        cursor.close()
         conn.close()
 
 # Initialize the database on app startup
@@ -65,10 +62,10 @@ init_db()
 def load_users():
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT username, name, password FROM users")
-        rows = cursor.fetchall()
-        users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
+        with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+            cursor.execute("SELECT username, name, password FROM users")
+            rows = cursor.fetchall()
+            users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
         conn.close()
         logger.debug(f"Loaded users from database: {list(users.keys())}")
         if not users:
@@ -191,9 +188,9 @@ def register():
         # Insert the new user into the database
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO users (username, name, password) VALUES (%s, %s, %s)', 
-                           (username, name, hashed_password))
+            with conn.cursor() as cursor:
+                cursor.execute('INSERT INTO users (username, name, password) VALUES (%s, %s, %s)', 
+                               (username, name, hashed_password))
             conn.commit()
             logger.info(f"Successfully registered user: {username}")
             flash('Registration successful! Please log in.', 'success')
@@ -203,7 +200,6 @@ def register():
             flash('Registration failed. Please try again.', 'danger')
             logger.debug("Rendering register.html due to registration failure")
         finally:
-            cursor.close()
             conn.close()
         return redirect(url_for('login'))
     logger.debug("Rendering register.html for GET request")
