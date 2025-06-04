@@ -8,6 +8,7 @@ import argparse
 import jwt
 import datetime
 import urllib.parse as urlparse
+from urllib.parse import quote
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -39,6 +40,7 @@ def get_db_connection():
 
 # Initialize the database schema
 def init_db():
+    conn = None  # Initialize conn to None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
@@ -54,7 +56,8 @@ def init_db():
     except Exception as e:
         logger.error(f"Failed to initialize database schema: {str(e)}")
     finally:
-        conn.close()
+        if conn is not None:  # Only close if conn was created
+            conn.close()
 
 # Initialize the database on app startup
 init_db()
@@ -136,8 +139,9 @@ def login():
                 }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
                 # Ensure token is a string
                 token = token.decode('utf-8') if isinstance(token, bytes) else token
-                logger.debug(f"Generated token: {token}")  # Add this line
-		session['token'] = token
+                segments = token.split('.')
+                logger.debug(f"Generated token: {token}, Segments: {len(segments)}")
+                session['token'] = token
                 logger.info(f"Token generated for {username}: {token}")
                 flash('Login successful! Welcome to your dashboard.', 'success')
                 logger.info(f"Successful login for {username}")
@@ -219,7 +223,7 @@ def dashboard():
         logger.error("Missing username or token in session, redirecting to login")
         flash('Session expired or invalid. Please log in again.', 'danger')
         return redirect(url_for('login'))
-    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={session.get('token', '')}")
+    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={quote(session.get('token', ''))}")
     logger.debug(f"Streamlit URL: {streamlit_url}")
     try:
         import requests
