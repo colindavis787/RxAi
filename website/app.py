@@ -26,10 +26,14 @@ def load_credentials():
     global config, users
     try:
         logger.debug("Attempting to load credentials.yaml")
+        if not os.path.exists(credentials_path):
+            logger.error("credentials.yaml file does not exist")
+            users = {}
+            return
         with open(credentials_path) as file:
             config = yaml.load(file, Loader=SafeLoader)
         users = config['credentials']['usernames']
-        logger.debug("Credentials loaded successfully")
+        logger.debug(f"Credentials loaded successfully. Users: {list(users.keys())}")
     except Exception as e:
         logger.error(f"Failed to load credentials.yaml: {str(e)}")
         users = {}
