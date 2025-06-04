@@ -51,15 +51,6 @@ def index():
         logger.error(f"Error rendering homepage: {str(e)}")
         return Response(f"Error rendering homepage: {str(e)}", status=500)
 
-@app.route('/test')
-def test():
-    try:
-        logger.debug("Accessing test route")
-        return Response("Test route working", status=200)
-    except Exception as e:
-        logger.error(f"Error in test route: {str(e)}")
-        return Response(f"Error in test: {str(e)}", status=500)
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     logger.debug("Accessing login route")
@@ -68,10 +59,11 @@ def login():
         return Response("Template login.html not found", status=500)
     if not users:
         logger.error("No users loaded from credentials.yaml")
-        flash('Authentication system is unavailable. Please contact support.', 'error')
+        flash('Authentication system is unavailable. Please contact support.', 'danger')
         return render_template('login.html')
     logger.debug(f"Request method: {request.method}")
     if request.method == 'POST':
+        logger.debug("Received POST request for login")
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         logger.debug(f"Form data received - Username: {username}, Password: {'[REDACTED]' if password else 'None'}")
@@ -99,8 +91,10 @@ def login():
                 session['name'] = users[username]['name']
                 token = jwt.encode({
                     'username': username,
-                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
                 }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+                # Ensure token is a string
+                token = token.decode('utf-8') if isinstance(token, bytes) else token
                 session['token'] = token
                 logger.info(f"Token generated for {username}: {token}")
                 flash('Login successful! Welcome to your dashboard.', 'success')
@@ -119,61 +113,6 @@ def login():
             return render_template('login.html')
     logger.debug("Rendering login.html for GET request")
     return render_template('login.html')
-
-@app.route('/dashboard')
-def dashboard():
-    try:
-        logger.debug("Accessing dashboard route")
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')):
-            logger.error("dashboard.html not found in templates directory")
-            return Response("Template dashboard.html not found", status=500)
-        if not session.get('authentication_status'):
-            logger.warning("Unauthorized dashboard access, redirecting to login")
-            return redirect(url_for('login'))
-        if not session.get('username') or not session.get('token'):
-            logger.error("Missing username or token in session, redirecting to login")
-            flash('Session expired or invalid. Please log in again.', 'error')
-            return redirect(url_for('login'))
-        streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session['username']}&token={session['token']}")
-        try:
-            import requests
-            response = requests.head(streamlit_url, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
-                flash('Streamlit app is currently unavailable. Please try again later.', 'error')
-        except requests.RequestException as e:
-            logger.error(f"Failed to reach Streamlit app: {str(e)}")
-            flash('Streamlit app is currently unavailable. Please try again later.', 'error')
-        return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
-    except Exception as e:
-        logger.error(f"Error in dashboard route: {str(e)}")
-        return Response(f"Error in dashboard: {str(e)}", status=500)
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    try:
-        logger.debug("Logging out")
-        session.pop('authentication_status', None)
-        session.pop('username', None)
-        session.pop('name', None)
-        return redirect(url_for('index'))
-    except Exception as e:
-        logger.error(f"Error in logout route: {str(e)}")
-        return Response(f"Error in logout: {str(e)}", status=500)
-
-@app.route('/streamlit')
-def streamlit_app():
-    try:
-        logger.debug("Accessing streamlit route")
-        if session.get('authentication_status'):
-            streamlit_url = os.getenv('STREAMLIT_URL', 'https://benefittech.streamlit.app/?embedded=true')
-            return redirect(streamlit_url)
-        logger.warning("Unauthorized streamlit access, redirecting to login")
-        return redirect(url_for('login'))
-    except Exception as e:
-        logger.error(f"Error in streamlit route: {str(e)}")
-        flash(f'Streamlit error: {str(e)}', 'error')
-        return redirect(url_for('dashboard'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -220,3 +159,50 @@ def register():
         return redirect(url_for('login'))
     logger.debug("Rendering register.html for GET request")
     return render_template('register.html')
+
+@app.route('/dashboard')
+def dashboard():
+    logger.debug("Accessing dashboard route")
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')):
+        logger.error("dashboard.html not found in templates directory")
+        return Response("Template dashboard.html not found", status=500)
+    if not session.get('authentication_status'):
+        logger.warning("Unauthorized dashboard access, redirecting to login")
+        return redirect(url_for('login'))
+    if not session.get('username') or not session.get('token'):
+        logger.error("Missing username or token in session, redirecting to login")
+        flash('Session expired or invalid. Please log in again.', 'danger')
+        return redirect(url_for('login'))
+    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={session.get('token', '')}")
+    logger.debug(f"Streamlit URL: {streamlit_url}")
+    try:
+        import requests
+        response = requests.head(streamlit_url, timeout=5)
+        if response.status_code != 200:
+            logger.warning(f"Streamlit app unavailable at {streamlit_url}, status code: {response.status_code}")
+            flash('Streamlit app is currently unavailable. Please try again later.', 'danger')
+    except requests.RequestException as e:
+        logger.error(f"Failed to reach Streamlit app: {str(e)}")
+        flash('Streamlit app is currently unavailable. Please try again later.', 'danger')
+    return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    try:
+        logger.debug("Accessing logout route")
+        session.clear()
+        logger.info("User logged out successfully")
+        return redirect(url_for('index'))
+    except Exception as e:
+        logger.error(f"Error during logout: {str(e)}")
+        return Response(f"Error during logout: {str(e)}", status=500)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Run the Flask app with specified port and host.')
+    parser.add_argument('--port', type=int, default=5001, help='Port to run the Flask app on (default: 5001)')
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the Flask app on (default: 127.0.0.1)')
+    parser.add_argument('--open-browser', action='store_true', help='Automatically open the browser after starting the server')
+    args = parser.parse_args()
+    if args.open_browser:
+        webbrowser.open_new(f"http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=True)
