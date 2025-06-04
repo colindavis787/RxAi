@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import bcrypt
 import os
 import logging
@@ -7,6 +8,7 @@ import webbrowser
 import argparse
 import jwt
 import datetime
+import urllib.parse as urlparse
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,19 +18,49 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
-# Database path
-db_path = os.path.join(os.path.dirname(__file__), 'users.db')
-
+# Database connection using DATABASE_URL
 def get_db_connection():
     try:
-        logger.debug(f"Connecting to database at: {db_path}")
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
+        url = urlparse.urlparse(os.getenv('DATABASE_URL'))
+        db_params = {
+            'dbname': url.path[1:],
+            'user': url.username,
+            'password': url.password,
+            'host': url.hostname,
+            'port': url.port,
+            'sslmode': 'require'
+        }
+        logger.debug("Connecting to Postgres database")
+        conn = psycopg2.connect(**db_params)
+        conn.cursor_factory = psycopg2.extras.DictCursor
         logger.debug("Database connection successful")
         return conn
     except Exception as e:
         logger.error(f"Failed to connect to database: {str(e)}")
         raise
+
+# Initialize the database schema
+def init_db():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                password TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+        logger.debug("Database schema initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database schema: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# Initialize the database on app startup
+init_db()
 
 def load_users():
     try:
@@ -160,7 +192,7 @@ def register():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('INSERT INTO users (username, name, password) VALUES (?, ?, ?)', 
+            cursor.execute('INSERT INTO users (username, name, password) VALUES (%s, %s, %s)', 
                            (username, name, hashed_password))
             conn.commit()
             logger.info(f"Successfully registered user: {username}")
@@ -171,6 +203,7 @@ def register():
             flash('Registration failed. Please try again.', 'danger')
             logger.debug("Rendering register.html due to registration failure")
         finally:
+            cursor.close()
             conn.close()
         return redirect(url_for('login'))
     logger.debug("Rendering register.html for GET request")
