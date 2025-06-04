@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
-import yaml
-from yaml.loader import SafeLoader
+import sqlite3
 import bcrypt
 import os
 import logging
@@ -17,29 +16,35 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
-# Global variables
-credentials_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'credentials.yaml')
-config = None
-users = {}
+# Database path
+db_path = os.path.join(os.path.dirname(__file__), 'users.db')
 
-def load_credentials():
-    global config, users
+def get_db_connection():
     try:
-        logger.debug("Attempting to load credentials.yaml")
-        if not os.path.exists(credentials_path):
-            logger.error("credentials.yaml file does not exist")
-            users = {}
-            return
-        with open(credentials_path) as file:
-            config = yaml.load(file, Loader=SafeLoader)
-        users = config['credentials']['usernames']
-        logger.debug(f"Credentials loaded successfully. Users: {list(users.keys())}")
+        logger.debug(f"Connecting to database at: {db_path}")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        logger.debug("Database connection successful")
+        return conn
     except Exception as e:
-        logger.error(f"Failed to load credentials.yaml: {str(e)}")
-        users = {}
+        logger.error(f"Failed to connect to database: {str(e)}")
+        raise
 
-# Load credentials at startup
-load_credentials()
+def load_users():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, name, password FROM users")
+        rows = cursor.fetchall()
+        users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
+        conn.close()
+        logger.debug(f"Loaded users from database: {list(users.keys())}")
+        if not users:
+            logger.warning("No users found in database")
+        return users
+    except Exception as e:
+        logger.error(f"Failed to load users from database: {str(e)}")
+        return {}
 
 @app.route('/')
 def index():
@@ -61,8 +66,9 @@ def login():
     if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
         logger.error("login.html not found in templates directory")
         return Response("Template login.html not found", status=500)
+    users = load_users()
     if not users:
-        logger.error("No users loaded from credentials.yaml")
+        logger.error("No users loaded from database")
         flash('Authentication system is unavailable. Please contact support.', 'danger')
         return render_template('login.html')
     logger.debug(f"Request method: {request.method}")
@@ -89,7 +95,9 @@ def login():
         stored_password = users[username]['password']
         logger.debug(f"Stored password hash: {stored_password}")
         try:
+            logger.debug("Attempting password verification with bcrypt")
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                logger.debug("Password verification successful")
                 session['authentication_status'] = True
                 session['username'] = username
                 session['name'] = users[username]['name']
@@ -140,6 +148,7 @@ def register():
             flash('Input is too long (max 50 characters).', 'danger')
             logger.debug("Rendering register.html due to input length")
             return render_template('register.html')
+        users = load_users()
         if username in users:
             logger.warning(f"Username {username} already exists")
             flash('Username already exists.', 'danger')
@@ -147,19 +156,22 @@ def register():
             return render_template('register.html')
         # Hash the password
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        # Update the users dictionary
-        users[username] = {
-            'name': name,
-            'password': hashed_password
-        }
-        # Save updated users to credentials.yaml
-        config['credentials']['usernames'] = users
-        with open(credentials_path, 'w') as file:
-            yaml.dump(config, file)
-        logger.info(f"Successfully registered user: {username}")
-        load_credentials()  # Reload users after saving
-        flash('Registration successful! Please log in.', 'success')
-        logger.debug(f"Redirecting to login for {username}")
+        # Insert the new user into the database
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO users (username, name, password) VALUES (?, ?, ?)', 
+                           (username, name, hashed_password))
+            conn.commit()
+            logger.info(f"Successfully registered user: {username}")
+            flash('Registration successful! Please log in.', 'success')
+            logger.debug(f"Redirecting to login for {username}")
+        except Exception as e:
+            logger.error(f"Failed to register user: {str(e)}")
+            flash('Registration failed. Please try again.', 'danger')
+            logger.debug("Rendering register.html due to registration failure")
+        finally:
+            conn.close()
         return redirect(url_for('login'))
     logger.debug("Rendering register.html for GET request")
     return render_template('register.html')
