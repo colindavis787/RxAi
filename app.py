@@ -12,22 +12,45 @@ import datetime
 from pathlib import Path
 import logging
 from urllib.parse import unquote
+import psycopg
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-# JWT secret key (will be updated later with the same key used in Flask)
+# JWT secret key
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
 
-# Load user credentials
-credentials_path = Path('.streamlit/credentials.yaml')
-try:
-    with open(credentials_path) as file:
-        config = yaml.load(file, Loader=SafeLoader)
-    users = config['credentials']['usernames']
-except Exception as e:
-    st.error(f"Failed to load credentials: {e}")
-    users = {}
+# Load user credentials from database
+def load_users():
+    try:
+        url = os.getenv('DATABASE_URL')
+        if not url:
+            raise ValueError("DATABASE_URL environment variable not set")
+        conninfo = {
+            'dbname': url.split('/')[3],
+            'user': url.split('//')[1].split(':')[0],
+            'password': url.split('//')[1].split(':')[1].split('@')[0],
+            'host': url.split('@')[1].split(':')[0],
+            'port': url.split(':')[3].split('/')[0],
+            'sslmode': 'require'
+        }
+        logger.debug("Connecting to Postgres database")
+        conn = psycopg.connect(**conninfo)
+        with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+            cursor.execute("SELECT username, name, password FROM users")
+            rows = cursor.fetchall()
+            users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
+        conn.close()
+        logger.debug(f"Loaded users from database: {list(users.keys())}")
+        if not users:
+            logger.warning("No users found in database")
+        return users
+    except Exception as e:
+        logger.error(f"Failed to load users from database: {str(e)}")
+        st.error(f"Failed to load users: {str(e)}")
+        return {}
+
+users = load_users()
 
 # Initialize session state for authentication and chat history
 if 'authenticated' not in st.session_state:
