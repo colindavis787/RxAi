@@ -11,7 +11,10 @@ import jwt
 import datetime
 from pathlib import Path
 import logging
+from urllib.parse import unquote
+
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 # JWT secret key (will be updated later with the same key used in Flask)
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
@@ -37,28 +40,41 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
 # Get username and token from URL parameters
-params = st.query_params
-username = params.get('username', [None])[0]
-token = params.get('token', [None])[0]
+query_params = st.query_params
+logger.debug(f"Raw query parameters: {query_params}")
+username = query_params.get('username', [None])[0]
+token = query_params.get('token', [None])[0]
+logger.debug(f"Extracted token before decoding: {token}")
+embedded = query_params.get('embedded', ['false'])[0].lower() == 'true'
+
+token = unquote(token) if token else None
+logger.debug(f"Token after decoding: {token}")
 
 # Authenticate user if token is present
 if username and token and not st.session_state.authenticated:
     try:
-        logger.debug(f"Decoding token for username: {username}, token: {token}")
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
-        if payload['username'] == username and username in users:
-            st.session_state.authenticated = True
-            st.session_state.username = username
-            st.session_state.name = users[username]['name']
+        if token.count('.') != 2:
+            logger.error(f"Malformed token received: {token}")
+            st.error("Invalid authentication token format.")
         else:
-            logger.warning("Token username mismatch or user not found")
-            st.error("Invalid authentication token.")
+            logger.debug(f"Decoding token for username: {username}, token: {token}")
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+            if payload['username'] == username and username in users:
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.session_state.name = users[username]['name']
+            else:
+                logger.warning("Token username mismatch or user not found")
+                st.error("Invalid authentication token.")
     except jwt.InvalidTokenError as e:
         logger.error(f"Invalid token error: {str(e)}")
         st.error("Invalid authentication token.")
     except jwt.ExpiredSignatureError:
         logger.error("Token has expired")
         st.error("Authentication token has expired. Please log in again.")
+    except Exception as e:
+        logger.error(f"Unexpected error during token validation: {str(e)}")
+        st.error("Error validating authentication token.")
 
 # Display the app if authenticated
 if st.session_state.authenticated:
