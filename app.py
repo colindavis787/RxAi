@@ -40,12 +40,12 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
 # Get username and token from URL parameters
-query_params = st.query_params
+query_params = st.query_params.to_dict()
 logger.debug(f"Raw query parameters: {query_params}")
-username = query_params.get('username', [None])[0]
-token = query_params.get('token', [None])[0]
+username = query_params.get('username')
+token = query_params.get('token')
 logger.debug(f"Extracted token before decoding: {token}")
-embedded = query_params.get('embedded', ['false'])[0].lower() == 'true'
+embedded = query_params.get('embedded', 'false').lower() == 'true'
 
 token = unquote(token) if token else None
 logger.debug(f"Token after decoding: {token}")
