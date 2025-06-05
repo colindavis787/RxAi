@@ -135,7 +135,7 @@ def login():
                 session['name'] = users[username]['name']
                 token = jwt.encode({
                     'username': username,
-                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+                    'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)
                 }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
                 # Ensure token is a string
                 token = token.decode('utf-8') if isinstance(token, bytes) else token
