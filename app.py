@@ -49,8 +49,9 @@ embedded = query_params.get('embedded', ['false'])[0].lower() == 'true'
 
 token = unquote(token) if token else None
 logger.debug(f"Token after decoding: {token}")
-
-# Authenticate user if token is present
+if token:
+    segments = token.split('.')
+    logger.debug(f"Token segments count: {len(segments)}")
 if username and token and not st.session_state.authenticated:
     try:
         if token.count('.') != 2:
