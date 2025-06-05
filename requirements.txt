@@ -9,5 +9,5 @@ pyyaml
 bcrypt
 requests
 cryptography
-pyjwt=2.10.1
+pyjwt==2.10.1
 psycopg[binary]==3.2.9
