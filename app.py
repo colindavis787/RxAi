@@ -53,7 +53,7 @@ def load_users():
 
 users = load_users()
 
-# Initialize session state for authentication and chat history
+# Initialize session state
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'username' not in st.session_state:
@@ -70,8 +70,8 @@ username = query_params.get('username')
 token = query_params.get('token')
 logger.debug(f"Extracted token before decoding: {token}")
 embedded = query_params.get('embedded', 'false').lower() == 'true'
-        
-token = unquote(token) if token else None 
+
+token = unquote(token) if token else None
 logger.debug(f"Token after decoding: {token}")
 if token:
     segments = token.split('.')
@@ -95,7 +95,7 @@ if username and token and not st.session_state.authenticated:
         logger.error(f"Invalid token error: {str(e)}")
         st.error("Invalid authentication token.")
     except jwt.ExpiredSignatureError:
-        logger.error("Token has expired") 
+        logger.error("Token has expired")
         st.error("Authentication token has expired. Please log in again.")
     except Exception as e:
         logger.error(f"Unexpected error during token validation: {str(e)}")
@@ -108,7 +108,7 @@ if st.session_state.authenticated:
     st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
     # Initialize xAI client
-    try: 
+    try:
         client = OpenAI(
             api_key=os.getenv("XAI_API_KEY") or st.secrets.get("XAI_API_KEY"),
             base_url="https://api.x.ai/v1"
@@ -116,10 +116,10 @@ if st.session_state.authenticated:
     except Exception as e:
         st.error(f"Error initializing AI client: {str(e)}. Please check XAI_API_KEY.")
         client = None
-        
+
     # Set page title
     st.title("Pharmacy Claims Analyzer")
-            
+
     # Display historical uploads
     st.write("### Past Uploads")
     try:
@@ -132,7 +132,7 @@ if st.session_state.authenticated:
             st.write("No past uploads found.")
     except Exception as e:
         st.error(f"Error accessing historical data: {str(e)}")
-    
+
     # Inflation rate slider
     inflation_rate = st.slider(
         "Annual Drug Price Inflation (%)",
@@ -145,7 +145,7 @@ if st.session_state.authenticated:
 
     # File uploader
     uploaded_file = st.file_uploader("Upload Excel file", type="xlsx")
-    
+
     if uploaded_file:
         # Validate file size (limit to 10MB)
         if uploaded_file.size > 10 * 1024 * 1024:
@@ -155,46 +155,64 @@ if st.session_state.authenticated:
             temp_file = "temp.xlsx"
             with open(temp_file, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-    
+
             # Run analysis with inflation rate
             cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
-        
+
             # Display messages
             st.write("### Status")
             st.write(messages)
-    
+
             if cleaned_df is not None:
                 # Display analysis results
                 if 'numeric_summary' in analysis_results:
                     st.write("### Numeric Column Summary")
                     st.dataframe(analysis_results['numeric_summary'])
-        
+
                 for key, value in analysis_results.items():
                     if key.endswith('_counts'):
                         st.write(f"### {key.replace('_counts', '')} Distribution")
                         st.dataframe(value.reset_index(name='Count'))
-        
+
                     elif key == 'claims_per_id':
                         st.write("### Claims per ID")
                         st.dataframe(value)
-    
+
                     elif key == 'cost_summary':
                         st.write("### Total Cost per ID")
                         st.dataframe(value)
-    
+
                     elif key == 'member_medications':
                         st.write("### Medications and Likely Conditions per Member")
-                        st.dataframe(value)
-        
+                        # Convert lists to strings with wrapping
+                        value_df = value.copy()
+                        value_df['Conditions'] = value_df['Conditions'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
+                        value_df['Drug Name'] = value_df['Drug Name'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
+                        st.dataframe(
+                            data=value_df,
+                            use_container_width=True,
+                            column_config={
+                                'Conditions': st.column_config.TextColumn(width='large'),
+                                'Drug Name': st.column_config.TextColumn(width='medium')
+                            }
+                        )
+
                 # Display anomalies
                 st.write("### Detected Anomalies")
                 st.dataframe(anomalies)
-                
+
                 # Display predictions
-                st.write(f"### Predicted Annual Drug Costs (2026–2028) at {inflation_rate*100:.1f}% Inflation")
+                st.write(f"### Predicted Annual Drug Costs at {inflation_rate*100:.1f}% Inflation")
                 if predictions:
+                    current_year = min(int(k) for k in predictions.keys())
+                    year_labels = {
+                        str(current_year): f"Current Year ({current_year})",
+                        str(current_year + 1): f"Year 1 ({current_year + 1})",
+                        str(current_year + 2): f"Year 2 ({current_year + 2})",
+                        str(current_year + 3): f"Year 3 ({current_year + 3})"
+                    }
                     prediction_df = pd.DataFrame({
-                        "Year": predictions.keys(),
+                        "Year": [year_labels.get(k, k) for k in predictions.keys()],
                         "Predicted Cost ($)": [f"${cost:,.2f}" for cost in predictions.values()]
                     })
                     st.table(prediction_df.style.set_properties(**{
@@ -207,19 +225,16 @@ if st.session_state.authenticated:
                         'selector': 'th',
                         'props': [('background-color', '#4B5EAA'), ('color', 'white')]
                     }]))
-                    
+
                     # Create Plotly line chart
                     fig = px.line(
-                        x=predictions.keys(),
+                        x=[year_labels.get(k, k) for k in predictions.keys()],
                         y=predictions.values(),
                         labels={'x': 'Year', 'y': 'Predicted Cost ($)'},
-                        title=f"Cost Trend Forecast (2026–2028) at {inflation_rate*100:.1f}% Inflation",
+                        title=f"Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation",
                         markers=True
                     )
-                    fig.update_traces(
-                        line_color='#003087',
-                        marker=dict(size=10, color='#4B5EAA')
-                    )
+                    fig.update_traces(line_color='#003087', marker=dict(size=10, color='#4B5EAA'))
                     fig.update_layout(
                         plot_bgcolor='#D3D3D3',
                         paper_bgcolor='#FFFFFF',
@@ -231,13 +246,13 @@ if st.session_state.authenticated:
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.error("No predictions available. Check processing summary for errors.")
-                
+
                 # Display charts
                 st.write("### Visualizations")
                 for chart in chart_files:
                     if os.path.exists(chart):
                         st.image(chart, caption=chart.replace('.png', ''))
-                
+
                 # Prepare data context for AI
                 context = ""
                 if 'numeric_summary' in analysis_results:
@@ -253,15 +268,15 @@ if st.session_state.authenticated:
                         context += "Medications and Conditions per Member:\n" + value.to_string(index=False) + "\n\n"
                 context += "Raw Data Sample (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
                 context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
-                context += "Predictions (2026–2028):\n"
+                context += "Predictions:\n"
                 if predictions:
                     for year, cost in predictions.items():
-                        context += f"Year {year}: ${cost:,.2f}\n"
-                
+                        context += f"Year {year_labels.get(year, year)}: ${cost:,.2f}\n"
+
                 # Q&A Section
                 st.write("### Ask a Question About the Data")
                 user_question = st.text_input("Enter your question (e.g., 'What condition is Member 9’s medication treating?' or 'How many claims per ID?')")
-                
+
                 if user_question:
                     if not user_question.strip():
                         st.warning("Please enter a valid question.")
@@ -269,8 +284,8 @@ if st.session_state.authenticated:
                         try:
                             response = client.chat.completions.create(
                                 model="grok-3",
-                                messages=[   
-                                    {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns, predictions, and medication conditions. Be concise and accurate."},
+                                messages=[
+                                    {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns, predictions, and medication conditions. Be concise."},
                                     {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
                                 ],
                                 max_tokens=300
@@ -278,23 +293,23 @@ if st.session_state.authenticated:
                             answer = response.choices[0].message.content.strip()
                             st.session_state.chat_history.append((user_question, answer))
                             st.write("**Answer**")
-                            st.write(answer)   
+                            st.write(answer)
                         except Exception as e:
                             st.error(f"Error getting AI response: {str(e)}")
                     else:
                         st.error("AI client not initialized. Check XAI_API_KEY.")
-                
+
                 # Display chat history
                 if st.session_state.chat_history:
                     st.write("### Chat History")
-                    for q, a in st.session_state.chat_history:  
+                    for q, a in st.session_state.chat_history:
                         st.write(f"**Q**: {q}\n**A**: {a}")
-                    
+
                 # Clear chat history button
                 if st.button("Clear Chat History"):
                     st.session_state.chat_history = []
                     st.rerun()
-                
+
             # Clean up temporary file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
@@ -303,7 +318,7 @@ else:
     st.markdown(
         """
         <a href="https://rxaianalytics.com/login" target="_blank" style="color: #1f77b4; text-decoration: underline;">
-            Log In Here (Opens in a New Tab)   
+            Log In Here (Opens in a New Tab)
         </a>
         """,
         unsafe_allow_html=True

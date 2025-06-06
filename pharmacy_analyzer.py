@@ -187,23 +187,46 @@ def visualize_data(analysis_results, df):
         plt.close()
         chart_files.append('claims_per_id_bar.png')
     
-    categorical_results = {k: v for k, v in analysis_results.items() if k.endswith('_counts')}
-    if categorical_results:
-        key = list(categorical_results.keys())[0]
-        plt.figure(figsize=(6, 6))
-        categorical_results[key].plot.pie(autopct='%1.1f%%', colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
-        plt.title(f'Distribution of {key.replace("_counts", "")}')
-        plt.ylabel('')
-        plt.savefig('categorical_pie.png')
+    # Member cost share vs plan cost chart
+    id_cols = [col for col in df.columns if 'member' in col.lower() or 'id' in col.lower()]
+    cost_cols = [col for col in df.columns if 'cost' in col.lower()]
+    if id_cols and 'Plan cost' in df.columns and 'Ingredient Cost' in df.columns:
+        id_col = id_cols[0]
+        cost_df = df.groupby(id_col).agg({
+            'Plan cost': 'sum',
+            'Ingredient Cost': 'sum'
+        }).reset_index()
+        cost_df['Member Cost'] = cost_df['Ingredient Cost'] - cost_df['Plan cost']
+        cost_df_melt = pd.melt(
+            cost_df,
+            id_vars=[id_col],
+            value_vars=['Member Cost', 'Plan cost'],
+            var_name='Cost Type',
+            value_name='Cost'
+        )
+        plt.figure(figsize=(12, 6))
+        sns.barplot(
+            data=cost_df_melt,
+            x=id_col,
+            y='Cost',
+            hue='Cost Type',
+            palette=['#4B5EAA', '#003087']
+        )
+        plt.title('Member Cost Share vs Plan Cost Share')
+        plt.xlabel('Member ID')
+        plt.ylabel('Cost ($)')
+        plt.legend(title='Cost Type')
+        plt.tight_layout()
+        plt.savefig('member_cost_share_bar.png')
         plt.close()
-        chart_files.append('categorical_pie.png')
-        
+        chart_files.append('member_cost_share_bar.png')
+    
     return chart_files
                     
-# Step 6: Predict future utilization and cost
+# Step 6: Predict total cost
 def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, inflation_rate=0.05):
     """
-    Predict total Plan cost for 2026, 2027, 2028 using DATE OF SERVICE and Plan cost.
+    Predict total Plan cost for current year and next three years (e.g., 2024–2027).
     Handles single or multiple years, applying inflation for single-year data or linear regression for multi-year.
     Returns a dictionary with years as keys and predicted costs as values, plus a message.
     """
@@ -228,7 +251,7 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
                 missing.append("DATE OF SERVICE")
             if cost_col is None:
                 missing.append("Plan cost")
-            return {}, f"Missing required columns: {', '.join(missing)}"
+            return None, f"Missing required columns: {', '.join(missing)}"
         
         # Convert DATE OF SERVICE to datetime
         try:
@@ -237,12 +260,12 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
             df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
         
         if df[date_col].isna().all():
-            return {}, "All DATE OF SERVICE values are invalid. Please check the date format."
+            return None, "All DATE OF SERVICE values are invalid. Please check the date format."
         
         # Ensure Plan cost is numeric
         df[cost_col] = pd.to_numeric(df[cost_col], errors='coerce')
         if df[cost_col].isna().all():
-            return {}, "All Plan cost values are invalid. Please check the cost data."
+            return None, "All Plan cost values are invalid. Please check the cost data."
         
         # Drop rows with missing dates or costs
         df = df.dropna(subset=[date_col, cost_col])
@@ -250,44 +273,43 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
         # Extract year from date
         df['year'] = df[date_col].dt.year
         
+        # Determine current year (most recent year in data)
+        current_year = df['year'].max()
+        future_years = [current_year + 1, current_year + 2, current_year + 3]
+        
         # Aggregate costs by year
         yearly_costs = df.groupby('year')[cost_col].sum().reset_index()
         
         # Handle predictions
-        predictions = {}
+        predictions = {current_year: yearly_costs[yearly_costs['year'] == current_year][cost_col].iloc[0] if current_year in yearly_costs['year'].values else 0.0}
         if len(yearly_costs) == 1:
-            # Single-year data: Use total cost and apply inflation
-            base_cost = yearly_costs[cost_col].iloc[0]
-            base_year = yearly_costs['year'].iloc[0]
-            years_ahead = [2026 - base_year, 2027 - base_year, 2028 - base_year]
-            predictions = {
-                '2026': base_cost * (1 + inflation_rate) ** years_ahead[0],
-                '2027': base_cost * (1 + inflation_rate) ** years_ahead[1],
-                '2028': base_cost * (1 + inflation_rate) ** years_ahead[2]
-            }
-            message = f"Single-year data detected. Predicted 2026–2028 costs using {inflation_rate*100}% annual inflation."
+            # Single-year data: Use current cost and apply inflation
+            base_cost = predictions[current_year]
+            years_ahead = [1, 2, 3]
+            for i, year in enumerate(future_years):
+                predictions[year] = base_cost * (1 + inflation_rate) ** years_ahead[i]
+            message = f"Single-year data detected for {current_year}. Predicted costs for {current_year}–{future_years[-1]} using {inflation_rate*100}% annual inflation."
         else:
             # Multi-year data: Use linear regression
             X = yearly_costs[['year']].values
             y = yearly_costs[cost_col].values
             model = LinearRegression()
             model.fit(X, y)
-            future_years = np.array([[2026], [2027], [2028]])
-            predicted_costs = model.predict(future_years)
+            future_years_array = np.array([[y] for y in future_years])
+            predicted_costs = model.predict(future_years_array)
             # Apply inflation
-            for i in range(len(predicted_costs)):
+            for i, year in enumerate(future_years):
                 predicted_costs[i] *= (1 + inflation_rate) ** (i + 1)
-            predictions = {
-                '2026': max(predicted_costs[0], 0),
-                '2027': max(predicted_costs[1], 0),
-                '2028': max(predicted_costs[2], 0)
-            }
-            message = f"Multi-year data detected. Predicted 2026–2028 costs using linear regression and {inflation_rate*100}% annual inflation."
+                predictions[year] = max(predicted_costs[i], 0)
+            message = f"Multi-year data detected. Predicted costs for {current_year}–{future_years[-1]} using linear regression and {inflation_rate*100}% annual inflation."
+        
+        # Convert years to strings for consistency
+        predictions = {str(k): v for k, v in predictions.items()}
         
         return predictions, message
     
     except Exception as e:
-        return {}, f"Error in prediction: {str(e)}"
+        return None, f"Error in prediction: {str(e)}"
                 
 # Step 7: Main function
 def main(file_path, inflation_rate=0.05):
