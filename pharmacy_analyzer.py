@@ -204,7 +204,7 @@ def visualize_data(analysis_results, df):
 def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, inflation_rate=0.05):
     """
     Predict total Plan cost for 2026, 2027, 2028 using DATE OF SERVICE and Plan cost.
-    Handles interchangeable column names and applies inflation rate.
+    Handles single or multiple years, applying inflation for single-year data or linear regression for multi-year.
     Returns a dictionary with years as keys and predicted costs as values, plus a message.
     """
     try:
@@ -253,37 +253,38 @@ def predict_utilization_cost(df, id_cols, date_cols, quantity_cols, cost_cols, i
         # Aggregate costs by year
         yearly_costs = df.groupby('year')[cost_col].sum().reset_index()
         
-        # Check if we have enough data
-        if len(yearly_costs) < 2:
-            return {}, "Not enough yearly data for prediction. Need at least 2 years."
+        # Handle predictions
+        predictions = {}
+        if len(yearly_costs) == 1:
+            # Single-year data: Use total cost and apply inflation
+            base_cost = yearly_costs[cost_col].iloc[0]
+            base_year = yearly_costs['year'].iloc[0]
+            years_ahead = [2026 - base_year, 2027 - base_year, 2028 - base_year]
+            predictions = {
+                '2026': base_cost * (1 + inflation_rate) ** years_ahead[0],
+                '2027': base_cost * (1 + inflation_rate) ** years_ahead[1],
+                '2028': base_cost * (1 + inflation_rate) ** years_ahead[2]
+            }
+            message = f"Single-year data detected. Predicted 2026–2028 costs using {inflation_rate*100}% annual inflation."
+        else:
+            # Multi-year data: Use linear regression
+            X = yearly_costs[['year']].values
+            y = yearly_costs[cost_col].values
+            model = LinearRegression()
+            model.fit(X, y)
+            future_years = np.array([[2026], [2027], [2028]])
+            predicted_costs = model.predict(future_years)
+            # Apply inflation
+            for i in range(len(predicted_costs)):
+                predicted_costs[i] *= (1 + inflation_rate) ** (i + 1)
+            predictions = {
+                '2026': max(predicted_costs[0], 0),
+                '2027': max(predicted_costs[1], 0),
+                '2028': max(predicted_costs[2], 0)
+            }
+            message = f"Multi-year data detected. Predicted 2026–2028 costs using linear regression and {inflation_rate*100}% annual inflation."
         
-        # Features: year; Target: total cost
-        X = yearly_costs[['year']].values
-        y = yearly_costs[cost_col].values
-        
-        # Train linear regression model
-        model = LinearRegression()
-        model.fit(X, y)
-        
-        # Predict for 2026, 2027, 2028
-        future_years = np.array([[2026], [2027], [2028]])
-        predictions = model.predict(future_years)
-        
-        # Apply inflation rate (compounded annually)
-        for i in range(len(predictions)):
-            predictions[i] *= (1 + inflation_rate) ** (i + 1)
-        
-        # Ensure non-negative predictions
-        predictions = np.maximum(predictions, 0)
-        
-        # Return dictionary of predictions
-        predictions_dict = {
-            '2026': predictions[0],
-            '2027': predictions[1],
-            '2028': predictions[2]
-        }
-        
-        return predictions_dict, f"Predictions generated for 2026–2028 with {inflation_rate*100}% annual inflation."
+        return predictions, message
     
     except Exception as e:
         return {}, f"Error in prediction: {str(e)}"
