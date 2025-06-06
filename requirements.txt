@@ -3,7 +3,7 @@ pandas
 numpy
 matplotlib
 seaborn
-scikit-learn
+scikit-learn==1.5.2
 openai
 pyyaml
 bcrypt
@@ -12,3 +12,4 @@ cryptography
 pyjwt==2.10.1
 psycopg[binary]==3.2.9
 openpyxl
+plotly==5.24.1
