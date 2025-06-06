@@ -223,7 +223,7 @@ if st.session_state.authenticated:
                         'font-weight': 'bold'
                     }).set_table_styles([{
                         'selector': 'th',
-                        'props': [('background-color', '#4B5EAA'), ('color', 'white')]
+                        'props': [('background-color', '#4B5EAA'), ('color', '#FFFFFF')]
                     }]))
 
                     # Create Plotly line chart
@@ -231,17 +231,17 @@ if st.session_state.authenticated:
                         x=[year_labels.get(k, k) for k in predictions.keys()],
                         y=predictions.values(),
                         labels={'x': 'Year', 'y': 'Predicted Cost ($)'},
-                        title=f"Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation",
+                        title=f'Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation',
                         markers=True
                     )
                     fig.update_traces(line_color='#003087', marker=dict(size=10, color='#4B5EAA'))
                     fig.update_layout(
                         plot_bgcolor='#D3D3D3',
                         paper_bgcolor='#FFFFFF',
-                        font_color='#000000',
+                        font_color='#000000',  # Changed to black for better visibility
                         title_font_color='#003087',
-                        xaxis_gridcolor='#A3BFFA',
-                        yaxis_gridcolor='#A3BFFA'
+                        xaxis_gridcolor='#4B5EAA',
+                        yaxis_gridcolor='#4B5EAA'
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -256,17 +256,17 @@ if st.session_state.authenticated:
                 # Prepare data context for AI
                 context = ""
                 if 'numeric_summary' in analysis_results:
-                    context += "Numeric Column Summary:\n" + analysis_results['numeric_summary'].to_string() + "\n\n"
+                    context += "Numeric Column Summary:\n" + analysis_results['numeric_summary'].fillna('').to_string() + "\n\n"
                 for key, value in analysis_results.items():
                     if key.endswith('_counts'):
                         context += f"{key.replace('_counts', '')} Distribution:\n" + value.to_string() + "\n\n"
                     elif key == 'claims_per_id':
-                        context += "Claims per ID:\n" + value.to_string(index=False) + "\n\n"
+                        context += "Claims Per ID:\n" + value.to_string(index=False) + "\n\n"
                     elif key == 'cost_summary':
                         context += "Total Cost per ID:\n" + value.to_string(index=False) + "\n\n"
                     elif key == 'member_medications':
-                        context += "Medications and Conditions per Member:\n" + value.to_string(index=False) + "\n\n"
-                context += "Raw Data Sample (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
+                        context += "Medications and Conditions:\n" + value.to_string(index=False) + "\n\n"
+                context += "Raw Data Preview (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
                 context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
                 context += "Predictions:\n"
                 if predictions:
@@ -275,7 +275,7 @@ if st.session_state.authenticated:
 
                 # Q&A Section
                 st.write("### Ask a Question About the Data")
-                user_question = st.text_input("Enter your question (e.g., 'What condition is Member 9’s medication treating?' or 'How many claims per ID?')")
+                user_question = st.text_input("Enter your question (e.g., 'What condition is drug treating?' or 'How many claims per ID?')")
 
                 if user_question:
                     if not user_question.strip():
@@ -292,7 +292,7 @@ if st.session_state.authenticated:
                             )
                             answer = response.choices[0].message.content.strip()
                             st.session_state.chat_history.append((user_question, answer))
-                            st.write("**Answer**")
+                            st.write("**Answer**:")
                             st.write(answer)
                         except Exception as e:
                             st.error(f"Error getting AI response: {str(e)}")
@@ -301,7 +301,7 @@ if st.session_state.authenticated:
 
                 # Display chat history
                 if st.session_state.chat_history:
-                    st.write("### Chat History")
+                    st.write("### History")
                     for q, a in st.session_state.chat_history:
                         st.write(f"**Q**: {q}\n**A**: {a}")
 
@@ -314,13 +314,13 @@ if st.session_state.authenticated:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 else:
-    st.error("Please log in via the website to access the dashboard.")
+    st.error("Please login via website to access dashboard.")
     st.markdown(
         """
-        <a href="https://rxaianalytics.com/login" target="_blank" style="color: #1f77b4; text-decoration: underline;">
+        <a href="https://rxaianalytics.com/login" target="_blank" style="color: #1f78b4; text-decoration: underline;">
             Log In Here (Opens in a New Tab)
         </a>
         """,
         unsafe_allow_html=True
     )
-    st.write("After logging in, return to this tab and refresh the page to access the dashboard.")
+    st.write("After logging in, return to this tab and refresh the page to access dashboard.")
