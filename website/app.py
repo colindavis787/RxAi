@@ -9,6 +9,10 @@ import jwt
 import datetime
 import urllib.parse as urlparse
 from urllib.parse import quote
+import boto3
+import os
+s3 = boto3.client('s3')
+bucket_name = os.getenv('S3_BUCKET', 'rxai-phi-854611169949')
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,8 +32,12 @@ def get_db_connection():
             'password': url.password,
             'host': url.hostname,
             'port': url.port,
-            'sslmode': 'require'
+            'sslmode': 'verify-full',
+            'sslrootcert': '/app/us-east-1-bundle.pem'  # Path for Elastic Beanstalk
         }
+        # For local testing, use local path
+        if os.getenv('AWS_EXECUTION_ENV') is None:
+            conninfo['sslrootcert'] = '/Users/colindavis/Desktop/pharmacy_claims_analyzer/us-east-1-bundle.pem'
         logger.debug("Connecting to Postgres database")
         conn = psycopg.connect(**conninfo)
         logger.debug("Database connection successful")
@@ -40,7 +48,7 @@ def get_db_connection():
 
 # Initialize the database schema
 def init_db():
-    conn = None  # Initialize conn to None
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
@@ -51,12 +59,21 @@ def init_db():
                     password TEXT NOT NULL
                 )
             ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS claims (
+                    upload_id TEXT,
+                    upload_date TEXT,
+                    column_name TEXT,
+                    column_value TEXT,
+                    row_id INTEGER
+                )
+            ''')
         conn.commit()
-        logger.debug("Database schema initialized successfully")
+        logger.debug("Database schema initialized successfully (users and claims tables)")
     except Exception as e:
         logger.error(f"Failed to initialize database schema: {str(e)}")
     finally:
-        if conn is not None:  # Only close if conn was created
+        if conn is not None:
             conn.close()
 
 # Initialize the database on app startup
