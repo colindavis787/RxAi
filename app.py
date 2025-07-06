@@ -4,7 +4,6 @@ from pharmacy_analyzer import main
 from openai import OpenAI
 import pandas as pd
 import sqlite3
-import matplotlib.pyplot as plt
 import yaml
 from yaml.loader import SafeLoader
 import jwt
@@ -103,8 +102,19 @@ if username and token and not st.session_state.authenticated:
 
 # Display the app if authenticated
 if st.session_state.authenticated:
-    # Display welcome message and logout link
-    st.write(f'Welcome *{st.session_state["name"]}*!')
+    # Custom CSS for styling
+    st.markdown(
+        """
+        <style>
+        .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
+        .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
+        .stDataFrame { max-height: 400px; overflow-y: auto; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    st.title("Pharmacy Claims Analyzer")
+    st.markdown(f"Welcome, *{st.session_state['name']}*!", unsafe_html=True)
     st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
     # Initialize xAI client
@@ -114,179 +124,140 @@ if st.session_state.authenticated:
             base_url="https://api.x.ai/v1"
         )
     except Exception as e:
-        st.error(f"Error initializing AI client: {str(e)}. Please check XAI_API_KEY.")
+        st.error(f"Error initializing AI client: {str(e)}")
         client = None
 
-    # Set page title
-    st.title("Pharmacy Claims Analyzer")
+    with st.container():
+        st.header("Past Uploads")
+        try:
+            conn = sqlite3.connect('claims_history.db')
+            past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
+            conn.close()
+            if not past_uploads.empty:
+                st.dataframe(past_uploads.head(25), use_container_width=True, hide_index=True)
+            else:
+                st.write("No past uploads found.")
+        except Exception as e:
+            st.error(f"Error accessing historical data: {str(e)}")
 
-    # Display historical uploads
-    st.write("### Past Uploads")
-    try:
-        conn = sqlite3.connect('claims_history.db')
-        past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
-        conn.close()
-        if not past_uploads.empty:
-            st.dataframe(past_uploads)
-        else:
-            st.write("No past uploads found.")
-    except Exception as e:
-        st.error(f"Error accessing historical data: {str(e)}")
-
-    # Inflation rate slider
-    inflation_rate = st.slider(
-        "Annual Drug Price Inflation (%)",
-        min_value=0.0,
-        max_value=10.0,
-        value=5.0,
-        step=0.1,
-        format="%.1f"
-    ) / 100  # Convert to decimal (e.g., 5% = 0.05)
-
-    # File uploader
-    uploaded_file = st.file_uploader("Upload Excel file", type="xlsx")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.header("Upload and Analyze")
+        inflation_rate = st.slider(
+            "Annual Drug Price Inflation (%)",
+            min_value=0.0, max_value=10.0, value=5.0, step=0.1, format="%.1f"
+        ) / 100
+        uploaded_file = st.file_uploader("Upload Excel file", type="xlsx")
+    with col2:
+        st.header("Quick Stats")
+        if uploaded_file:
+            st.write("File uploaded. Processing...")
 
     if uploaded_file:
-        # Validate file size (limit to 10MB)
         if uploaded_file.size > 10 * 1024 * 1024:
             st.error("File size exceeds 10MB limit.")
         else:
-            # Save uploaded file temporarily
             temp_file = "temp.xlsx"
             with open(temp_file, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-
-            # Run analysis with inflation rate
             cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
-
-            # Display messages
-            st.write("### Status")
+            st.subheader("Processing Status")
             st.write(messages)
 
             if cleaned_df is not None:
-                # Display analysis results
-                if 'numeric_summary' in analysis_results:
-                    st.write("### Numeric Column Summary")
-                    st.dataframe(analysis_results['numeric_summary'])
+                tabs = st.tabs(["Summary", "Visualizations", "Anomalies", "Predictions", "Q&A"])
+                with tabs[0]:
+                    st.subheader("Analysis Summary")
+                    if 'numeric_summary' in analysis_results:
+                        st.write("Numeric Column Summary")
+                        # Remove specified columns
+                        numeric_summary = analysis_results['numeric_summary'].drop(columns=['Member Number', 'NDC', 'AWP'], errors='ignore')
+                        st.dataframe(numeric_summary.head(25), use_container_width=True, hide_index=True)
 
-                for key, value in analysis_results.items():
-                    if key.endswith('_counts'):
-                        st.write(f"### {key.replace('_counts', '')} Distribution")
-                        st.dataframe(value.reset_index(name='Count'))
+                    for key, value in analysis_results.items():
+                        if key.endswith('_counts') and 'B/G Fill Indicator' not in key:
+                            st.write(f"### {key.replace('_counts', '')} Distribution")
+                            st.dataframe(value.head(25).reset_index(), use_container_width=True, hide_index=True)
+                        elif key == 'claims_per_id':
+                            st.write("### Claims per ID")
+                            st.dataframe(value.head(25), use_container_width=True, hide_index=True)
+                        elif key == 'cost_summary':
+                            st.write("### Total Cost per ID")
+                            st.dataframe(value.head(25), use_container_width=True, hide_index=True)
+                        elif key == 'member_medications':
+                            st.write("### Medications and Conditions")
+                            value_df = value.copy()
+                            value_df['Conditions'] = value_df['Conditions'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
+                            value_df['Drug Name'] = value_df['Drug Name'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
+                            st.dataframe(value_df.head(25), use_container_width=True, hide_index=True)
 
-                    elif key == 'claims_per_id':
-                        st.write("### Claims per ID")
-                        st.dataframe(value)
+                with tabs[1]:
+                    st.subheader("Visualizations")
+                    for chart in chart_files:
+                        if os.path.exists(chart):
+                            st.image(chart, caption=chart.replace('.png', ''))
 
-                    elif key == 'cost_summary':
-                        st.write("### Total Cost per ID")
-                        st.dataframe(value)
+                with tabs[2]:
+                    st.subheader("Detected Anomalies")
+                    st.dataframe(anomalies.head(25), use_container_width=True, hide_index=True)
 
-                    elif key == 'member_medications':
-                        st.write("### Medications and Likely Conditions per Member")
-                        # Convert lists to strings with wrapping
-                        value_df = value.copy()
-                        value_df['Conditions'] = value_df['Conditions'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
-                        value_df['Drug Name'] = value_df['Drug Name'].apply(lambda x: '; '.join(str(i) for i in x) if isinstance(x, list) else str(x))
-                        st.dataframe(
-                            data=value_df,
-                            use_container_width=True,
-                            column_config={
-                                'Conditions': st.column_config.TextColumn(width='large'),
-                                'Drug Name': st.column_config.TextColumn(width='medium')
-                            }
+                with tabs[3]:
+                    st.subheader(f"Predicted Costs at {inflation_rate*100:.1f}% Inflation")
+                    if predictions:
+                        current_year = min(int(k) for k in predictions.keys())
+                        year_labels = {
+                            str(current_year): f"Current Year ({current_year})",
+                            str(current_year + 1): f"Year 1 ({current_year + 1})",
+                            str(current_year + 2): f"Year 2 ({current_year + 2})",
+                            str(current_year + 3): f"Year 3 ({current_year + 3})"
+                        }
+                        prediction_df = pd.DataFrame({
+                            "Year": [year_labels.get(k, k) for k in predictions.keys()],
+                            "Predicted Cost ($)": [f"${cost:,.2f}" for cost in predictions.values()]
+                        })
+                        st.table(prediction_df.style.set_properties(**{
+                            'background-color': '#003087',
+                            'color': 'white',
+                            'text-align': 'center'
+                        }))
+                        fig = px.line(
+                            x=[year_labels.get(k, k) for k in predictions.keys()],
+                            y=[cost for cost in predictions.values()],
+                            labels={'x': 'Year', 'y': 'Predicted Cost ($)'},
+                            title=f'Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation',
+                            markers=True
                         )
+                        fig.update_traces(line_color='#003087', marker=dict(size=10, color='#4B5EAA'))
+                        fig.update_layout(
+                            plot_bgcolor='#D3D3D3',
+                            paper_bgcolor='#FFFFFF',
+                            font_color='#000000',
+                            title_font_color='#003087'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.error("No predictions available. Check processing summary for errors.")
 
-                # Display anomalies
-                st.write("### Detected Anomalies")
-                st.dataframe(anomalies)
-
-                # Display predictions
-                st.write(f"### Predicted Annual Drug Costs at {inflation_rate*100:.1f}% Inflation")
-                if predictions:
-                    current_year = min(int(k) for k in predictions.keys())
-                    year_labels = {
-                        str(current_year): f"Current Year ({current_year})",
-                        str(current_year + 1): f"Year 1 ({current_year + 1})",
-                        str(current_year + 2): f"Year 2 ({current_year + 2})",
-                        str(current_year + 3): f"Year 3 ({current_year + 3})"
-                    }
-                    prediction_df = pd.DataFrame({
-                        "Year": [year_labels.get(k, k) for k in predictions.keys()],
-                        "Predicted Cost ($)": [f"${cost:,.2f}" for cost in predictions.values()]
-                    })
-                    st.table(prediction_df.style.set_properties(**{
-                        'background-color': '#003087',
-                        'color': 'white',
-                        'border-color': '#D3D3D3',
-                        'text-align': 'center',
-                        'font-weight': 'bold'
-                    }).set_table_styles([{
-                        'selector': 'th',
-                        'props': [('background-color', '#4B5EAA'), ('color', '#FFFFFF')]
-                    }]))
-
-                    # Create Plotly line chart
-                    fig = px.line(
-                        x=[year_labels.get(k, k) for k in predictions.keys()],
-                        y=predictions.values(),
-                        labels={'x': 'Year', 'y': 'Predicted Cost ($)'},
-                        title=f'Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation',
-                        markers=True
-                    )
-                    fig.update_traces(line_color='#003087', marker=dict(size=10, color='#4B5EAA'))
-                    fig.update_layout(
-                        plot_bgcolor='#D3D3D3',
-                        paper_bgcolor='#FFFFFF',
-                        font_color='#000000',  # Changed to black for better visibility
-                        title_font_color='#003087',
-                        xaxis_gridcolor='#4B5EAA',
-                        yaxis_gridcolor='#4B5EAA'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.error("No predictions available. Check processing summary for errors.")
-
-                # Display charts
-                st.write("### Visualizations")
-                for chart in chart_files:
-                    if os.path.exists(chart):
-                        st.image(chart, caption=chart.replace('.png', ''))
-
-                # Prepare data context for AI
-                context = ""
-                if 'numeric_summary' in analysis_results:
-                    context += "Numeric Column Summary:\n" + analysis_results['numeric_summary'].fillna('').to_string() + "\n\n"
-                for key, value in analysis_results.items():
-                    if key.endswith('_counts'):
-                        context += f"{key.replace('_counts', '')} Distribution:\n" + value.to_string() + "\n\n"
-                    elif key == 'claims_per_id':
-                        context += "Claims Per ID:\n" + value.to_string(index=False) + "\n\n"
-                    elif key == 'cost_summary':
-                        context += "Total Cost per ID:\n" + value.to_string(index=False) + "\n\n"
-                    elif key == 'member_medications':
-                        context += "Medications and Conditions:\n" + value.to_string(index=False) + "\n\n"
-                context += "Raw Data Preview (first 5 rows):\n" + cleaned_df.head().to_string(index=False) + "\n\n"
-                context += "Anomalies:\n" + anomalies.to_string(index=False) + "\n\n"
-                context += "Predictions:\n"
-                if predictions:
-                    for year, cost in predictions.items():
-                        context += f"Year {year_labels.get(year, year)}: ${cost:,.2f}\n"
-
-                # Q&A Section
-                st.write("### Ask a Question About the Data")
-                user_question = st.text_input("Enter your question (e.g., 'What condition is drug treating?' or 'How many claims per ID?')")
-
-                if user_question:
-                    if not user_question.strip():
-                        st.warning("Please enter a valid question.")
-                    elif client:
+                with tabs[4]:
+                    st.subheader("Ask About Your Data")
+                    user_question = st.text_input("Enter your question")
+                    if user_question and client:
+                        context = ""
+                        if 'numeric_summary' in analysis_results:
+                            context += "Numeric Summary:\n" + analysis_results['numeric_summary'].drop(columns=['Member Number', 'NDC', 'AWP'], errors='ignore').to_string() + "\n\n"
+                        for key, value in analysis_results.items():
+                            if key.endswith('_counts') and 'B/G Fill Indicator' not in key:
+                                context += f"{key.replace('_counts', '')} Distribution:\n" + value.head(25).to_string() + "\n\n"
+                            elif key in ['claims_per_id', 'cost_summary', 'member_medications']:
+                                context += f"{key}:\n" + value.head(25).to_string(index=False) + "\n\n"
+                        context += "Anomalies:\n" + anomalies.head(25).to_string(index=False) + "\n\n"
+                        context += "Predictions:\n" + prediction_df.to_string(index=False) + "\n"
                         try:
                             response = client.chat.completions.create(
                                 model="grok-3",
                                 messages=[
-                                    {"role": "system", "content": "You are an AI assistant analyzing pharmacy claims data. Answer questions based on the provided data context, covering any columns, predictions, and medication conditions. Be concise."},
-                                    {"role": "user", "content": f"Data context:\n{context}\n\nQuestion: {user_question}"}
+                                    {"role": "system", "content": "Answer questions based on pharmacy claims data."},
+                                    {"role": "user", "content": f"Context:\n{context}\nQuestion: {user_question}"}
                                 ],
                                 max_tokens=300
                             )
@@ -295,22 +266,17 @@ if st.session_state.authenticated:
                             st.write("**Answer**:")
                             st.write(answer)
                         except Exception as e:
-                            st.error(f"Error getting AI response: {str(e)}")
-                    else:
-                        st.error("AI client not initialized. Check XAI_API_KEY.")
+                            st.error(f"Error: {str(e)}")
 
-                # Display chat history
-                if st.session_state.chat_history:
-                    st.write("### History")
-                    for q, a in st.session_state.chat_history:
-                        st.write(f"**Q**: {q}\n**A**: {a}")
+                    if st.session_state.chat_history:
+                        st.write("### History")
+                        for q, a in st.session_state.chat_history:
+                            st.write(f"**Q**: {q}\n**A**: {a}")
 
-                # Clear chat history button
-                if st.button("Clear Chat History"):
-                    st.session_state.chat_history = []
-                    st.rerun()
+                    if st.button("Clear Chat History"):
+                        st.session_state.chat_history = []
+                        st.rerun()
 
-            # Clean up temporary file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 else:
