@@ -86,7 +86,7 @@ if username and token and not st.session_state.authenticated:
             if payload['username'] == username and username in users:
                 st.session_state.authenticated = True
                 st.session_state.username = username
-                st.session_state.name = users[username]['name']
+                st.session_state.name = users[username].get('name', 'User')  # Default to 'User' if name is missing
             else:
                 logger.warning("Token username mismatch or user not found")
                 st.error("Invalid authentication token.")
@@ -114,7 +114,7 @@ if st.session_state.authenticated:
         unsafe_allow_html=True
     )
     st.title("Pharmacy Claims Analyzer")
-    st.markdown(f"Welcome, *{st.session_state['name']}*!", unsafe_html=True)
+    st.markdown(f"Welcome, *{st.session_state['name']}*!", unsafe_allow_html=True)
     st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
     # Initialize xAI client
