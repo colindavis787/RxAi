@@ -13,12 +13,45 @@ import logging
 from urllib.parse import unquote
 import psycopg
 import plotly.express as px
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # JWT secret key
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
+
+# Create claims table
+def create_claims_table():
+    try:
+        url = os.getenv('DATABASE_URL')
+        if not url:
+            raise ValueError("DATABASE_URL environment variable not set")
+        conn = psycopg.connect(url)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS claims (
+                id SERIAL PRIMARY KEY,
+                upload_id TEXT,
+                hashed_ssn TEXT,
+                date DATE,
+                medication TEXT,
+                cost FLOAT
+            )
+        """)
+        conn.commit()
+        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        if 'claims' in tables:
+            st.success("Claims table created successfully or already exists.")
+        else:
+            st.error("Error: 'claims' table not found after creation attempt.")
+    except Exception as e:
+        st.error(f"Error creating claims table: {str(e)}")
 
 # Load user credentials from database
 def load_users():
@@ -50,6 +83,47 @@ def load_users():
         st.error(f"Failed to load users: {str(e)}")
         return {}
 
+# Store claims in PostgreSQL database
+def store_claims(df, upload_id):
+    try:
+        url = os.getenv('DATABASE_URL')
+        conn = psycopg.connect(dbname=url.split('/')[3],
+                              user=url.split('//')[1].split(':')[0],
+                              password=url.split('//')[1].split(':')[1].split('@')[0],
+                              host=url.split('@')[1].split(':')[0],
+                              port=url.split(':')[3].split('/')[0],
+                              sslmode='require')
+        cursor = conn.cursor()
+        ssn_cols = [col for col in df.columns if 'ssn' in col.lower() or 'social' in col.lower()]
+        if not ssn_cols:
+            logger.error("No SSN column found in data")
+            st.error("No SSN column found in data. Please ensure your Excel file includes an SSN column.")
+            return
+        ssn_col = ssn_cols[0]
+        date_col = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
+        date_col = date_col[0] if date_col else None
+        drug_col = [col for col in df.columns if 'drug' in col.lower() or 'medication' in col.lower()]
+        drug_col = drug_col[0] if drug_col else None
+        cost_col = [col for col in df.columns if 'cost' in col.lower()]
+        cost_col = cost_col[0] if cost_col else None
+        if not all([ssn_col, date_col, drug_col, cost_col]):
+            missing = [c for c, v in [('SSN', ssn_col), ('Date', date_col), ('Drug', drug_col), ('Cost', cost_col)] if not v]
+            logger.error(f"Missing required columns: {', '.join(missing)}")
+            st.error(f"Missing required columns: {', '.join(missing)}")
+            return
+        for _, row in df.iterrows():
+            cursor.execute(
+                "INSERT INTO claims (upload_id, hashed_ssn, date, medication, cost) VALUES (%s, %s, %s, %s, %s)",
+                (upload_id, row[ssn_col], row[date_col], row[drug_col], row[cost_col])
+            )
+        conn.commit()
+        conn.close()
+        logger.debug(f"Stored claims for upload_id: {upload_id}")
+        st.success(f"Claims stored in database for upload ID: {upload_id}")
+    except Exception as e:
+        logger.error(f"Failed to store claims: {str(e)}")
+        st.error(f"Database error: {str(e)}")
+
 users = load_users()
 
 # Initialize session state
@@ -67,7 +141,6 @@ query_params = st.query_params.to_dict()
 logger.debug(f"Raw query parameters: {query_params}")
 username = query_params.get('username')
 token = query_params.get('token')
-logger.debug(f"Extracted token before decoding: {token}")
 embedded = query_params.get('embedded', 'false').lower() == 'true'
 
 token = unquote(token) if token else None
@@ -86,7 +159,7 @@ if username and token and not st.session_state.authenticated:
             if payload['username'] == username and username in users:
                 st.session_state.authenticated = True
                 st.session_state.username = username
-                st.session_state.name = users[username].get('name', 'User')  # Default to 'User' if name is missing
+                st.session_state.name = users[username].get('name', 'User')
             else:
                 logger.warning("Token username mismatch or user not found")
                 st.error("Invalid authentication token.")
@@ -102,7 +175,6 @@ if username and token and not st.session_state.authenticated:
 
 # Display the app if authenticated
 if st.session_state.authenticated:
-    # Custom CSS for styling
     st.markdown(
         """
         <style>
@@ -117,7 +189,11 @@ if st.session_state.authenticated:
     st.markdown(f"Welcome, *{st.session_state['name']}*!", unsafe_allow_html=True)
     st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
-    # Initialize xAI client
+    # Button to create claims table
+    st.sidebar.header("Admin Actions")
+    if st.sidebar.button("Create Claims Table"):
+        create_claims_table()
+
     try:
         client = OpenAI(
             api_key=os.getenv("XAI_API_KEY") or st.secrets.get("XAI_API_KEY"),
@@ -158,9 +234,12 @@ if st.session_state.authenticated:
             st.error("File size exceeds 10MB limit.")
         else:
             temp_file = "temp.xlsx"
+            upload_id = f"upload_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
             with open(temp_file, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             cleaned_df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_file, inflation_rate)
+            if cleaned_df is not None:
+                store_claims(cleaned_df, upload_id)
             st.subheader("Processing Status")
             st.write(messages)
 
@@ -170,8 +249,7 @@ if st.session_state.authenticated:
                     st.subheader("Analysis Summary")
                     if 'numeric_summary' in analysis_results:
                         st.write("Numeric Column Summary")
-                        # Remove specified columns
-                        numeric_summary = analysis_results['numeric_summary'].drop(columns=['Member Number', 'NDC', 'AWP'], errors='ignore')
+                        numeric_summary = analysis_results['numeric_summary'].drop(columns=['SSN', 'Social Security Number', 'NDC', 'AWP'], errors='ignore')
                         st.dataframe(numeric_summary.head(25), use_container_width=True, hide_index=True)
 
                     for key, value in analysis_results.items():
@@ -244,7 +322,7 @@ if st.session_state.authenticated:
                     if user_question and client:
                         context = ""
                         if 'numeric_summary' in analysis_results:
-                            context += "Numeric Summary:\n" + analysis_results['numeric_summary'].drop(columns=['Member Number', 'NDC', 'AWP'], errors='ignore').to_string() + "\n\n"
+                            context += "Numeric Summary:\n" + analysis_results['numeric_summary'].drop(columns=['SSN', 'Social Security Number', 'NDC', 'AWP'], errors='ignore').to_string() + "\n\n"
                         for key, value in analysis_results.items():
                             if key.endswith('_counts') and 'B/G Fill Indicator' not in key:
                                 context += f"{key.replace('_counts', '')} Distribution:\n" + value.head(25).to_string() + "\n\n"
