@@ -53,35 +53,23 @@ def create_claims_table():
     except Exception as e:
         st.error(f"Error creating claims table: {str(e)}")
 
-# Load user credentials from database
-def load_users():
+# Verify claims table exists
+def verify_claims_table():
     try:
         url = os.getenv('DATABASE_URL')
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
-        conninfo = {
-            'dbname': url.split('/')[3],
-            'user': url.split('//')[1].split(':')[0],
-            'password': url.split('//')[1].split(':')[1].split('@')[0],
-            'host': url.split('@')[1].split(':')[0],
-            'port': url.split(':')[3].split('/')[0],
-            'sslmode': 'require'
-        }
-        logger.debug("Connecting to Postgres database")
-        conn = psycopg.connect(**conninfo)
-        with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
-            cursor.execute("SELECT username, name, password FROM users")
-            rows = cursor.fetchall()
-            users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
+        conn = psycopg.connect(url)
+        cursor = conn.cursor()
+        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+        tables = [row[0] for row in cursor.fetchall()]
         conn.close()
-        logger.debug(f"Loaded users from database: {list(users.keys())}")
-        if not users:
-            logger.warning("No users found in database")
-        return users
+        if 'claims' in tables:
+            st.success("Verified: 'claims' table exists in the database.")
+        else:
+            st.error("Error: 'claims' table does not exist.")
     except Exception as e:
-        logger.error(f"Failed to load users from database: {str(e)}")
-        st.error(f"Failed to load users: {str(e)}")
-        return {}
+        st.error(f"Error verifying claims table: {str(e)}")
 
 # Store claims in PostgreSQL database
 def store_claims(df, upload_id):
@@ -189,10 +177,12 @@ if st.session_state.authenticated:
     st.markdown(f"Welcome, *{st.session_state['name']}*!", unsafe_allow_html=True)
     st.sidebar.markdown("[Logout](https://rxaianalytics.com/logout)")
 
-    # Button to create claims table
+    # Admin actions in sidebar
     st.sidebar.header("Admin Actions")
     if st.sidebar.button("Create Claims Table"):
         create_claims_table()
+    if st.sidebar.button("Verify Claims Table"):
+        verify_claims_table()
 
     try:
         client = OpenAI(
