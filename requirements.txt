@@ -13,3 +13,6 @@ pyjwt==2.10.1
 psycopg[binary]==3.2.9
 openpyxl
 plotly==5.24.1
+tensorflow-macos==2.17.0
+tensorflow-metal==1.1.0
+python-dotenv==1.1.1
