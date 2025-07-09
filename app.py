@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from pharmacy_analyzer import main
+from pharmacy_analyzer import main, hash_ssn
 from openai import OpenAI
 import pandas as pd
 import sqlite3
@@ -14,6 +14,8 @@ from urllib.parse import unquote
 import psycopg
 import plotly.express as px
 from dotenv import load_dotenv
+import tensorflow as tf
+from lstm_model import predict_future_meds, fetch_claims_data
 
 # Load environment variables
 load_dotenv()
@@ -132,7 +134,7 @@ def store_claims(df, upload_id):
         for _, row in df.iterrows():
             cursor.execute(
                 "INSERT INTO claims (upload_id, hashed_ssn, date, medication, cost) VALUES (%s, %s, %s, %s, %s)",
-                (upload_id, row[ssn_col], row[date_col], row[drug_col], row[cost_col])
+                (upload_id, hash_ssn(row[ssn_col]), row[date_col], row[drug_col], row[cost_col])
             )
         conn.commit()
         conn.close()
@@ -300,41 +302,44 @@ if st.session_state.authenticated:
                     st.dataframe(anomalies.head(25), use_container_width=True, hide_index=True)
 
                 with tabs[3]:
-                    st.subheader(f"Predicted Costs at {inflation_rate*100:.1f}% Inflation")
-                    if predictions:
-                        current_year = min(int(k) for k in predictions.keys())
-                        year_labels = {
-                            str(current_year): f"Current Year ({current_year})",
-                            str(current_year + 1): f"Year 1 ({current_year + 1})",
-                            str(current_year + 2): f"Year 2 ({current_year + 2})",
-                            str(current_year + 3): f"Year 3 ({current_year + 3})"
-                        }
-                        prediction_df = pd.DataFrame({
-                            "Year": [year_labels.get(k, k) for k in predictions.keys()],
-                            "Predicted Cost ($)": [f"${cost:,.2f}" for cost in predictions.values()]
-                        })
-                        st.table(prediction_df.style.set_properties(**{
-                            'background-color': '#003087',
-                            'color': 'white',
-                            'text-align': 'center'
-                        }))
-                        fig = px.line(
-                            x=[year_labels.get(k, k) for k in predictions.keys()],
-                            y=[cost for cost in predictions.values()],
-                            labels={'x': 'Year', 'y': 'Predicted Cost ($)'},
-                            title=f'Cost Trend Forecast at {inflation_rate*100:.1f}% Inflation',
-                            markers=True
-                        )
-                        fig.update_traces(line_color='#003087', marker=dict(size=10, color='#4B5EAA'))
-                        fig.update_layout(
-                            plot_bgcolor='#D3D3D3',
-                            paper_bgcolor='#FFFFFF',
-                            font_color='#000000',
-                            title_font_color='#003087'
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.error("No predictions available. Check processing summary for errors.")
+                    st.subheader("LSTM Predictions")
+                    try:
+                        model_path = 'lstm_model.h5'
+                        if os.path.exists(model_path):
+                            model = tf.keras.models.load_model(model_path)
+                            historical_df = fetch_claims_data()
+                            if not historical_df.empty:
+                                all_meds = historical_df['medication'].unique()
+                                med_to_idx = {med: idx + 1 for idx, med in enumerate(all_meds)}
+                                lstm_predictions = predict_future_meds(cleaned_df, model, med_to_idx)
+                                if lstm_predictions:
+                                    prediction_df = pd.DataFrame({
+                                        "Hashed SSN": list(lstm_predictions.keys()),
+                                        "Kidney Disease Medication Probability (%)": [f"{prob*100:.2f}" for prob in lstm_predictions.values()]
+                                    })
+                                    st.dataframe(prediction_df, use_container_width=True, hide_index=True)
+                                    fig = px.bar(
+                                        x=prediction_df["Hashed SSN"],
+                                        y=prediction_df["Kidney Disease Medication Probability (%)"],
+                                        labels={'x': 'Hashed SSN', 'y': 'Probability (%)'},
+                                        title='LSTM Predicted Probability of Kidney Disease Medication',
+                                        color_discrete_sequence=['#003087']
+                                    )
+                                    fig.update_layout(
+                                        plot_bgcolor='#D3D3D3',
+                                        paper_bgcolor='#FFFFFF',
+                                        font_color='#000000',
+                                        title_font_color='#003087'
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                else:
+                                    st.error("No LSTM predictions available. Ensure sufficient data with hypertension medications.")
+                            else:
+                                st.error("No historical claims data found in database.")
+                        else:
+                            st.error("LSTM model not yet trained. Please train the model first.")
+                    except Exception as e:
+                        st.error(f"Error loading LSTM model or making predictions: {str(e)}")
 
                 with tabs[4]:
                     st.subheader("Ask About Your Data")
