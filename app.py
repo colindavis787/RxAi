@@ -200,8 +200,8 @@ if st.session_state.authenticated:
         .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
         .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
         .stDataFrame { max-height: 400px; overflow-y: auto; overflow-x: auto; min-width: 800px; }
-        table.dataframe { width: 100% !important; min-width: 800px; }
-        .stDataFrame th, .stDataFrame td { white-space: nowrap; text-align: left; }
+        .stDataFrame table { width: 100% !important; min-width: 800px; table-layout: auto; }
+        .stDataFrame th, .stDataFrame td { white-space: nowrap; text-align: left; overflow: hidden; text-overflow: ellipsis; }
         </style>
         """,
         unsafe_allow_html=True
@@ -332,6 +332,8 @@ if st.session_state.authenticated:
                                             color_discrete_sequence=['#003087']
                                         )
                                         fig.update_layout(
+                                            width=800,  # Minimum width
+                                            autosize=True,  # Allow resizing
                                             plot_bgcolor='#D3D3D3',
                                             paper_bgcolor='#FFFFFF',
                                             font_color='#000000',
