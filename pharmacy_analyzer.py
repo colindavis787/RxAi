@@ -38,11 +38,11 @@ def main(file_path, inflation_rate):
         df = pd.read_excel(file_path)
         messages = ["File read successfully."]
 
-        # Data cleaning
-        required_columns = ['SSN', 'Date of Service', 'Drug Name', 'Plan Cost']
+        # Required columns (SSN is optional)
+        required_columns = ['Date of Service', 'Drug Name', 'Plan Cost']
         if not all(col in df.columns for col in required_columns):
             missing = [col for col in required_columns if col not in df.columns]
-            messages.append(f"Missing columns: {', '.join(missing)}")
+            messages.append(f"Missing required columns: {', '.join(missing)}. Analysis aborted.")
             return None, messages, {}, pd.DataFrame(), [], {}
 
         # Convert Date of Service to datetime
@@ -53,9 +53,15 @@ def main(file_path, inflation_rate):
         df = df.dropna(subset=required_columns)
         messages.append(f"Dropped {len(df) - len(df.dropna())} rows with missing values.")
 
-        # Hash SSNs
-        df['Hashed SSN'] = df['SSN'].apply(hash_ssn)
-        messages.append("Hashed SSNs for privacy.")
+        # Hash SSNs if present
+        has_ssn = any(col.lower() in ['ssn', 'social security number'] for col in df.columns)
+        if has_ssn:
+            ssn_col = next(col for col in df.columns if col.lower() in ['ssn', 'social security number'])
+            df['Hashed SSN'] = df[ssn_col].apply(hash_ssn)
+            messages.append("Hashed SSNs for privacy.")
+        else:
+            df['Hashed SSN'] = 'N/A'
+            messages.append("No SSN column found; skipping SSN hashing.")
 
         # Basic analysis
         analysis_results = {}
@@ -68,13 +74,20 @@ def main(file_path, inflation_rate):
         for col in categorical_cols:
             analysis_results[f"{col}_counts"] = df[col].value_counts()
 
-        # Claims per ID
-        analysis_results['claims_per_id'] = df.groupby('Hashed SSN').size().reset_index(name='Claim Count')
-        messages.append("Calculated claims per ID.")
+        # Claims per ID (if SSN present)
+        if has_ssn:
+            analysis_results['claims_per_id'] = df.groupby('Hashed SSN').size().reset_index(name='Claim Count')
+            messages.append("Calculated claims per ID.")
+        else:
+            analysis_results['claims_per_id'] = pd.DataFrame({'Hashed SSN': ['N/A'], 'Claim Count': [len(df)]})
+            messages.append("No SSN column; counted total claims.")
 
         # Cost summary
-        analysis_results['cost_summary'] = df.groupby('Hashed SSN')['Plan Cost'].sum().reset_index(name='Total Cost')
-        messages.append("Calculated total cost per ID.")
+        if has_ssn:
+            analysis_results['cost_summary'] = df.groupby('Hashed SSN')['Plan Cost'].sum().reset_index(name='Total Cost')
+        else:
+            analysis_results['cost_summary'] = pd.DataFrame({'Hashed SSN': ['N/A'], 'Total Cost': [df['Plan Cost'].sum()]})
+        messages.append("Calculated total cost.")
 
         # Anomaly detection
         iso = IsolationForest(contamination=0.1, random_state=42)
