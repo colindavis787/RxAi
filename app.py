@@ -105,6 +105,10 @@ def verify_claims_table():
 
 # Store claims in PostgreSQL database
 def store_claims(df, upload_id):
+    has_ssn = any(col.lower() in ['ssn', 'social security number'] for col in df.columns)
+    if not has_ssn:
+        st.warning("No SSN column found; skipping database storage.")
+        return
     try:
         url = os.getenv('DATABASE_URL')
         conn = psycopg.connect(dbname=url.split('/')[3],
@@ -114,12 +118,7 @@ def store_claims(df, upload_id):
                               port=url.split(':')[3].split('/')[0],
                               sslmode='require')
         cursor = conn.cursor()
-        ssn_cols = [col for col in df.columns if 'ssn' in col.lower() or 'social' in col.lower()]
-        if not ssn_cols:
-            logger.error("No SSN column found in data")
-            st.error("No SSN column found in data. Please ensure your Excel file includes an SSN column.")
-            return
-        ssn_col = ssn_cols[0]
+        ssn_col = next(col for col in df.columns if col.lower() in ['ssn', 'social security number'])
         date_col = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
         date_col = date_col[0] if date_col else None
         drug_col = [col for col in df.columns if 'drug' in col.lower() or 'medication' in col.lower()]
@@ -200,7 +199,20 @@ if st.session_state.authenticated:
         <style>
         .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
         .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
-        .stDataFrame { max-height: 400px; overflow-y: auto; }
+        .stDataFrame { 
+            max-height: 400px; 
+            overflow-x: auto; 
+            width: 100%; 
+            min-width: 800px; 
+        }
+        .stDataFrame table { 
+            width: 100%; 
+            table-layout: auto; 
+        }
+        .stDataFrame th, .stDataFrame td { 
+            white-space: nowrap; 
+            text-align: left; 
+        }
         </style>
         """,
         unsafe_allow_html=True
@@ -263,7 +275,8 @@ if st.session_state.authenticated:
             if cleaned_df is not None:
                 store_claims(cleaned_df, upload_id)
             st.subheader("Processing Status")
-            st.write(messages)
+            for msg in messages:
+                st.write(msg)
 
             if cleaned_df is not None:
                 tabs = st.tabs(["Summary", "Visualizations", "Anomalies", "Predictions", "Q&A"])
@@ -303,43 +316,47 @@ if st.session_state.authenticated:
 
                 with tabs[3]:
                     st.subheader("LSTM Predictions")
-                    try:
-                        model_path = 'lstm_model.h5'
-                        if os.path.exists(model_path):
-                            model = tf.keras.models.load_model(model_path)
-                            historical_df = fetch_claims_data()
-                            if not historical_df.empty:
-                                all_meds = historical_df['medication'].unique()
-                                med_to_idx = {med: idx + 1 for idx, med in enumerate(all_meds)}
-                                lstm_predictions = predict_future_meds(cleaned_df, model, med_to_idx)
-                                if lstm_predictions:
-                                    prediction_df = pd.DataFrame({
-                                        "Hashed SSN": list(lstm_predictions.keys()),
-                                        "Kidney Disease Medication Probability (%)": [f"{prob*100:.2f}" for prob in lstm_predictions.values()]
-                                    })
-                                    st.dataframe(prediction_df, use_container_width=True, hide_index=True)
-                                    fig = px.bar(
-                                        x=prediction_df["Hashed SSN"],
-                                        y=prediction_df["Kidney Disease Medication Probability (%)"],
-                                        labels={'x': 'Hashed SSN', 'y': 'Probability (%)'},
-                                        title='LSTM Predicted Probability of Kidney Disease Medication',
-                                        color_discrete_sequence=['#003087']
-                                    )
-                                    fig.update_layout(
-                                        plot_bgcolor='#D3D3D3',
-                                        paper_bgcolor='#FFFFFF',
-                                        font_color='#000000',
-                                        title_font_color='#003087'
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
+                    has_ssn = any(col.lower() in ['ssn', 'social security number'] for col in cleaned_df.columns)
+                    if not has_ssn:
+                        st.warning("No SSN column found; skipping LSTM predictions.")
+                    else:
+                        try:
+                            model_path = 'lstm_model.h5'
+                            if os.path.exists(model_path):
+                                model = tf.keras.models.load_model(model_path)
+                                historical_df = fetch_claims_data()
+                                if not historical_df.empty:
+                                    all_meds = historical_df['medication'].unique()
+                                    med_to_idx = {med: idx + 1 for idx, med in enumerate(all_meds)}
+                                    lstm_predictions = predict_future_meds(cleaned_df, model, med_to_idx)
+                                    if lstm_predictions:
+                                        prediction_df = pd.DataFrame({
+                                            "Hashed SSN": list(lstm_predictions.keys()),
+                                            "Kidney Disease Medication Probability (%)": [f"{prob*100:.2f}" for prob in lstm_predictions.values()]
+                                        })
+                                        st.dataframe(prediction_df, use_container_width=True, hide_index=True)
+                                        fig = px.bar(
+                                            x=prediction_df["Hashed SSN"],
+                                            y=prediction_df["Kidney Disease Medication Probability (%)"],
+                                            labels={'x': 'Hashed SSN', 'y': 'Probability (%)'},
+                                            title='LSTM Predicted Probability of Kidney Disease Medication',
+                                            color_discrete_sequence=['#003087']
+                                        )
+                                        fig.update_layout(
+                                            plot_bgcolor='#D3D3D3',
+                                            paper_bgcolor='#FFFFFF',
+                                            font_color='#000000',
+                                            title_font_color='#003087'
+                                        )
+                                        st.plotly_chart(fig, use_container_width=True)
+                                    else:
+                                        st.error("No LSTM predictions available. Ensure sufficient data with hypertension medications.")
                                 else:
-                                    st.error("No LSTM predictions available. Ensure sufficient data with hypertension medications.")
+                                    st.error("No historical claims data found in database.")
                             else:
-                                st.error("No historical claims data found in database.")
-                        else:
-                            st.error("LSTM model not yet trained. Please train the model first.")
-                    except Exception as e:
-                        st.error(f"Error loading LSTM model or making predictions: {str(e)}")
+                                st.error("LSTM model not yet trained. Please train the model first.")
+                        except Exception as e:
+                            st.error(f"Error loading LSTM model or making predictions: {str(e)}")
 
                 with tabs[4]:
                     st.subheader("Ask About Your Data")
@@ -354,7 +371,7 @@ if st.session_state.authenticated:
                             elif key in ['claims_per_id', 'cost_summary', 'member_medications']:
                                 context += f"{key}:\n" + value.head(25).to_string(index=False) + "\n\n"
                         context += "Anomalies:\n" + anomalies.head(25).to_string(index=False) + "\n\n"
-                        context += "Predictions:\n" + prediction_df.to_string(index=False) + "\n"
+                        context += "Predictions:\n" + (prediction_df.to_string(index=False) if 'prediction_df' in locals() else "No LSTM predictions available.")
                         try:
                             response = client.chat.completions.create(
                                 model="grok-3",
