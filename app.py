@@ -199,20 +199,9 @@ if st.session_state.authenticated:
         <style>
         .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
         .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
-        .stDataFrame { 
-            max-height: 400px; 
-            overflow-x: auto; 
-            width: 100%; 
-            min-width: 800px; 
-        }
-        .stDataFrame table { 
-            width: 100%; 
-            table-layout: auto; 
-        }
-        .stDataFrame th, .stDataFrame td { 
-            white-space: nowrap; 
-            text-align: left; 
-        }
+        .stDataFrame { max-height: 400px; overflow-y: auto; overflow-x: auto; min-width: 800px; }
+        table.dataframe { width: 100% !important; min-width: 800px; }
+        .stDataFrame th, .stDataFrame td { white-space: nowrap; text-align: left; }
         </style>
         """,
         unsafe_allow_html=True
