@@ -69,9 +69,12 @@ def create_claims_table():
                 id SERIAL PRIMARY KEY,
                 upload_id TEXT,
                 hashed_ssn TEXT,
-                date DATE,
+                date_of_service DATE,
                 medication TEXT,
-                cost FLOAT
+                cost FLOAT,
+                quantity FLOAT,
+                ndc TEXT,
+                days_supply INTEGER
             )
         """)
         conn.commit()
@@ -125,6 +128,12 @@ def store_claims(df, upload_id):
         drug_col = drug_col[0] if drug_col else None
         cost_col = [col for col in df.columns if 'cost' in col.lower()]
         cost_col = cost_col[0] if cost_col else None
+        quantity_col = [col for col in df.columns if 'quantity' in col.lower()]
+        quantity_col = quantity_col[0] if quantity_col else None
+        ndc_col = [col for col in df.columns if 'ndc' in col.lower()]
+        ndc_col = ndc_col[0] if ndc_col else None
+        days_supply_col = [col for col in df.columns if 'days supply' in col.lower() or 'days_supply' in col.lower()]
+        days_supply_col = days_supply_col[0] if days_supply_col else None
         if not all([ssn_col, date_col, drug_col, cost_col]):
             missing = [c for c, v in [('SSN', ssn_col), ('Date', date_col), ('Drug', drug_col), ('Cost', cost_col)] if not v]
             logger.error(f"Missing required columns: {', '.join(missing)}")
@@ -132,8 +141,17 @@ def store_claims(df, upload_id):
             return
         for _, row in df.iterrows():
             cursor.execute(
-                "INSERT INTO claims (upload_id, hashed_ssn, date, medication, cost) VALUES (%s, %s, %s, %s, %s)",
-                (upload_id, hash_ssn(row[ssn_col]), row[date_col], row[drug_col], row[cost_col])
+                "INSERT INTO claims (upload_id, hashed_ssn, date_of_service, medication, cost, quantity, ndc, days_supply) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    upload_id,
+                    hash_ssn(row[ssn_col]),
+                    row[date_col],
+                    row[drug_col],
+                    row[cost_col],
+                    row[quantity_col] if quantity_col else None,
+                    row[ndc_col] if ndc_col else None,
+                    int(row[days_supply_col]) if days_supply_col and pd.notnull(row[days_supply_col]) else None
+                )
             )
         conn.commit()
         conn.close()
@@ -199,9 +217,22 @@ if st.session_state.authenticated:
         <style>
         .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
         .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
-        .stDataFrame { max-height: 400px; overflow-y: auto; overflow-x: auto; min-width: 800px; }
-        .stDataFrame table { width: 100% !important; min-width: 800px; table-layout: auto; }
-        .stDataFrame th, .stDataFrame td { white-space: nowrap; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+        .stDataFrame { 
+            max-height: 400px; 
+            overflow-x: auto; 
+            width: 100%; 
+            min-width: 1000px; 
+        }
+        .stDataFrame table { 
+            width: 100%; 
+            table-layout: auto; 
+        }
+        .stDataFrame th, .stDataFrame td { 
+            white-space: normal; 
+            text-align: left; 
+            word-wrap: break-word; 
+            max-width: 300px; 
+        }
         </style>
         """,
         unsafe_allow_html=True
@@ -317,7 +348,9 @@ if st.session_state.authenticated:
                                 if not historical_df.empty:
                                     all_meds = historical_df['medication'].unique()
                                     med_to_idx = {med: idx + 1 for idx, med in enumerate(all_meds)}
-                                    lstm_predictions = predict_future_meds(cleaned_df, model, med_to_idx)
+                                    all_ndcs = historical_df['ndc'].dropna().unique()
+                                    ndc_to_idx = {ndc: idx + 1 for idx, ndc in enumerate(all_ndcs)}
+                                    lstm_predictions = predict_future_meds(cleaned_df, model, med_to_idx, ndc_to_idx)
                                     if lstm_predictions:
                                         prediction_df = pd.DataFrame({
                                             "Hashed SSN": list(lstm_predictions.keys()),
@@ -332,8 +365,6 @@ if st.session_state.authenticated:
                                             color_discrete_sequence=['#003087']
                                         )
                                         fig.update_layout(
-                                            width=800,  # Minimum width
-                                            autosize=True,  # Allow resizing
                                             plot_bgcolor='#D3D3D3',
                                             paper_bgcolor='#FFFFFF',
                                             font_color='#000000',
