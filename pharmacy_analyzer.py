@@ -38,7 +38,7 @@ def main(file_path, inflation_rate):
         df = pd.read_excel(file_path)
         messages = ["File read successfully."]
 
-        # Required columns (SSN is optional)
+        # Required columns (SSN, Quantity, NDC, Days Supply are optional)
         required_columns = ['Date of Service', 'Drug Name', 'Plan Cost']
         if not all(col in df.columns for col in required_columns):
             missing = [col for col in required_columns if col not in df.columns]
@@ -50,6 +50,7 @@ def main(file_path, inflation_rate):
         messages.append("Converted Date of Service to datetime.")
 
         # Handle missing values
+        required_plus_optional = required_columns + ['Quantity', 'NDC', 'Days Supply']
         df = df.dropna(subset=required_columns)
         messages.append(f"Dropped {len(df) - len(df.dropna())} rows with missing values.")
 
@@ -63,6 +64,12 @@ def main(file_path, inflation_rate):
             df['Hashed SSN'] = 'N/A'
             messages.append("No SSN column found; skipping SSN hashing.")
 
+        # Handle optional columns
+        for col in ['Quantity', 'NDC', 'Days Supply']:
+            if col not in df.columns:
+                df[col] = np.nan
+                messages.append(f"No {col} column found; set to NaN.")
+
         # Basic analysis
         analysis_results = {}
         numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -70,7 +77,7 @@ def main(file_path, inflation_rate):
         messages.append("Generated numeric summary.")
 
         # Categorical analysis
-        categorical_cols = ['Drug Name']
+        categorical_cols = ['Drug Name', 'NDC'] if 'NDC' in df.columns else ['Drug Name']
         for col in categorical_cols:
             analysis_results[f"{col}_counts"] = df[col].value_counts()
 
@@ -94,7 +101,7 @@ def main(file_path, inflation_rate):
         df_numeric = df[numeric_cols]
         anomalies = df.copy()
         anomalies['Anomaly'] = iso.fit_predict(df_numeric)
-        anomalies = anomalies[anomalies['Anomaly'] == -1][['Hashed SSN', 'Date of Service', 'Drug Name', 'Plan Cost']]
+        anomalies = anomalies[anomalies['Anomaly'] == -1][['Hashed SSN', 'Date of Service', 'Drug Name', 'Plan Cost', 'Quantity', 'NDC', 'Days Supply']]
         messages.append("Performed anomaly detection.")
 
         # Visualizations
@@ -148,7 +155,7 @@ def main(file_path, inflation_rate):
                 condition = f"Error: {str(e)}"
             conditions.append(condition)
         df['Conditions'] = conditions
-        analysis_results['member_medications'] = df[['Hashed SSN', 'Drug Name', 'Conditions']].drop_duplicates()
+        analysis_results['member_medications'] = df[['Hashed SSN', 'Drug Name', 'Conditions', 'Quantity', 'NDC', 'Days Supply']].drop_duplicates()
         messages.append("Inferred medical conditions for medications.")
 
         return df, messages, analysis_results, anomalies, chart_files, predictions
