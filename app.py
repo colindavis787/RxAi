@@ -8,15 +8,19 @@ import argparse
 import jwt
 import datetime
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging to output to stderr
+logging.basicConfig(
+    level=logging.DEBUG,
+    handlers=[logging.StreamHandler()],  # Explicitly use stderr
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+app = Flask(__name__, static_folder='static')  # Remove hardcoded template_folder
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
-# Database path
+# Database path (relative to app location, adjust for EB if using a different DB)
 db_path = os.path.join(os.path.dirname(__file__), 'users.db')
 
 def get_db_connection():
@@ -25,7 +29,7 @@ def get_db_connection():
         conn.row_factory = sqlite3.Row
         return conn
     except Exception as e:
-        logger.error(f"Failed to connect to database: {str(e)}")
+        logger.error(f"Failed to connect to database: {str(e)}", exc_info=True)
         raise
 
 def load_users():
@@ -38,21 +42,18 @@ def load_users():
         logger.debug(f"Loaded users from database: {list(users.keys())}")
         return users
     except Exception as e:
-        logger.error(f"Failed to load users from database: {str(e)}")
+        logger.error(f"Failed to load users from database: {str(e)}", exc_info=True)
         return {}
 
 @app.route('/')
 def index():
     try:
         logger.debug("Attempting to render index.html")
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'index.html')):
-            logger.error("index.html not found in templates directory")
-            return Response("Template index.html not found", status=500)
-        result = render_template('index.html')
+        result = render_template('index.html')  # Flask will look in 'website/templates/' by default
         logger.debug("Successfully rendered index.html")
         return result
     except Exception as e:
-        logger.error(f"Error rendering homepage: {str(e)}")
+        logger.error(f"Error rendering homepage: {str(e)}", exc_info=True)
         return Response(f"Error rendering homepage: {str(e)}", status=500)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -153,7 +154,7 @@ def register():
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute('INSERT INTO users (username, name, password) VALUES (?, ?, ?)', 
+            cursor.execute('INSERT INTO users (username, name, password) VALUES (?, ?, ?)',
                            (username, name, hashed_password))
             conn.commit()
             logger.info(f"Successfully registered user: {username}")
