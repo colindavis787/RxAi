@@ -26,3 +26,6 @@ pharmacy_tool_env_311/
 pharmacy_claims_analyzer.zip
 *.dylib
 pharmacy_tool_env_311/ # Exclude entire env dir
+pharmacy_claims_analyzer.zip
+*.dylib
+pharmacy_tool_env_311/ # Exclude entire env dir
