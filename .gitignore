@@ -1,43 +1,24 @@
-# Python virtual environment
 pharmacy_tool_env/
-*.venv/
-
-# Sensitive files
-encryption_key.key
-cleaned_pharmacy_claims.csv
-claims_history.db
-
-# Python cache and compiled files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# macOS system files
-.DS_Store
-
-# Temporary or backup files
-*.bak
-*.swp
-*~
-*.rtf
-*.txt~*
-
-# Logs and runtime data
-*.log
-
-# IDE and editor files
-.vscode/
-.idea/
-
-# Other project-specific files
-committed_pharmacy_analyzer.py
-website_plan.txt.rtf
-requirements.txt~pip
-.streamlit/
+*.db
 *.xlsx
+*.key
+*~
+*.docx
+*.rtf
 *.csv
 *.png
-*.docx
-*.~*~
-website/heroku_logs.txt
+*.bak
+
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+credentials.yaml
+.streamlit/secrets.toml
+encryption_key.key
+claims_history.db
+*.csv
+*.png
+*.xlsx
+credentials.yaml

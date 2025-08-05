@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
-import psycopg
+import psycopg2
 import bcrypt
-import os
 import logging
 import webbrowser
 import argparse
@@ -11,35 +10,35 @@ import urllib.parse as urlparse
 from urllib.parse import quote
 import boto3
 import os
-s3 = boto3.client('s3')
-bucket_name = os.getenv('S3_BUCKET', 'rxai-phi-854611169949')
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+app = Flask(__name__, static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
-# Database connection using DATABASE_URL
+# Database connection using parsed DATABASE_URL with SSL
 def get_db_connection():
     try:
-        url = urlparse.urlparse(os.getenv('DATABASE_URL'))
-        conninfo = {
-            'dbname': url.path[1:],
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable not set or empty")
+        logger.debug(f"Retrieved DATABASE_URL: {database_url}")
+        
+        # Parse the URL into components
+        url = urlparse.urlparse(database_url)
+        db_params = {
+            'dbname': url.path[1:],  # Remove leading slash
             'user': url.username,
             'password': url.password,
             'host': url.hostname,
             'port': url.port,
-            'sslmode': 'verify-full',
-            'sslrootcert': '/app/us-east-1-bundle.pem'  # Path for Elastic Beanstalk
+            'sslmode': 'require',
+            'sslrootcert': 'website/rds-ca-2019-root.pem'  # Ensure this file exists in the deployment
         }
-        # For local testing, use local path
-        if os.getenv('AWS_EXECUTION_ENV') is None:
-            conninfo['sslrootcert'] = '/Users/colindavis/Desktop/pharmacy_claims_analyzer/us-east-1-bundle.pem'
-        logger.debug("Connecting to Postgres database")
-        conn = psycopg.connect(**conninfo)
+        conn = psycopg2.connect(**db_params)
         logger.debug("Database connection successful")
         return conn
     except Exception as e:
@@ -80,13 +79,20 @@ def init_db():
 init_db()
 
 def load_users():
+    conn = None
     try:
         conn = get_db_connection()
-        with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
-            cursor.execute("SELECT username, name, password FROM users")
-            rows = cursor.fetchall()
-            users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
-        conn.close()
+        try:
+            import psycopg2.extras
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute("SELECT username, name, password FROM users")
+                rows = cursor.fetchall()
+        except AttributeError:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT username, name, password FROM users")
+                rows = cursor.fetchall()
+                rows = [dict(zip(['username', 'name', 'password'], row)) for row in rows]
+        users = {row['username']: {'name': row['name'], 'password': row['password']} for row in rows}
         logger.debug(f"Loaded users from database: {list(users.keys())}")
         if not users:
             logger.warning("No users found in database")
@@ -94,27 +100,24 @@ def load_users():
     except Exception as e:
         logger.error(f"Failed to load users from database: {str(e)}")
         return {}
+    finally:
+        if conn is not None:
+            conn.close()
 
 @app.route('/')
 def index():
     try:
         logger.debug("Attempting to render index.html")
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'index.html')):
-            logger.error("index.html not found in templates directory")
-            return Response("Template index.html not found", status=500)
         result = render_template('index.html')
         logger.debug("Successfully rendered index.html")
         return result
     except Exception as e:
-        logger.error(f"Error rendering homepage: {str(e)}")
+        logger.error(f"Error rendering homepage: {str(e)}", exc_info=True)
         return Response(f"Error rendering homepage: {str(e)}", status=500)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     logger.debug("Accessing login route")
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'login.html')):
-        logger.error("login.html not found in templates directory")
-        return Response("Template login.html not found", status=500)
     users = load_users()
     if not users:
         logger.error("No users loaded from database")
@@ -144,20 +147,15 @@ def login():
         stored_password = users[username]['password']
         logger.debug(f"Stored password hash: {stored_password}")
         try:
-            logger.debug("Attempting password verification with bcrypt")
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
-                logger.debug("Password verification successful")
                 session['authentication_status'] = True
                 session['username'] = username
                 session['name'] = users[username]['name']
                 token = jwt.encode({
                     'username': username,
-                    'exp': datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=24)
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
                 }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
-                # Ensure token is a string
                 token = token.decode('utf-8') if isinstance(token, bytes) else token
-                segments = token.split('.')
-                logger.debug(f"Generated token: {token}, Segments: {len(segments)}")
                 session['token'] = token
                 logger.info(f"Token generated for {username}: {token}")
                 flash('Login successful! Welcome to your dashboard.', 'success')
@@ -180,10 +178,8 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     logger.debug("Accessing register route")
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'register.html')):
-        logger.error("register.html not found in templates directory")
-        return Response("Template register.html not found", status=500)
     logger.debug(f"Request method: {request.method}")
+    conn = None  # Initialize to None
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         username = request.form.get('username', '').strip()
@@ -207,7 +203,6 @@ def register():
             return render_template('register.html')
         # Hash the password
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        # Insert the new user into the database
         try:
             conn = get_db_connection()
             with conn.cursor() as cursor:
@@ -221,18 +216,17 @@ def register():
             logger.error(f"Failed to register user: {str(e)}")
             flash('Registration failed. Please try again.', 'danger')
             logger.debug("Rendering register.html due to registration failure")
+            return render_template('register.html', error=str(e))
         finally:
-            conn.close()
-        return redirect(url_for('login'))
-    logger.debug("Rendering register.html for GET request")
-    return render_template('register.html')
+            if conn is not None:
+                conn.close()
+    else:
+        logger.debug("Rendering register.html for GET request")
+        return render_template('register.html')
 
 @app.route('/dashboard')
 def dashboard():
     logger.debug("Accessing dashboard route")
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')):
-        logger.error("dashboard.html not found in templates directory")
-        return Response("Template dashboard.html not found", status=500)
     if not session.get('authentication_status'):
         logger.warning("Unauthorized dashboard access, redirecting to login")
         return redirect(url_for('login'))
@@ -240,7 +234,7 @@ def dashboard():
         logger.error("Missing username or token in session, redirecting to login")
         flash('Session expired or invalid. Please log in again.', 'danger')
         return redirect(url_for('login'))
-    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={quote(session.get('token', ''))}")
+    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={session.get('token', '')}")
     logger.debug(f"Streamlit URL: {streamlit_url}")
     try:
         import requests
