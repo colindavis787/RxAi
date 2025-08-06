@@ -1,27 +1,28 @@
 version: 1.0
-runtime: python311  # Explicitly set to Python 3.11
+runtime: python311
 build:
   commands:
     pre-build:
       - echo "Python version:"
       - python3 --version
-      - echo "Installing pip..."
-      - yum install -y python3-pip  # Ensures pip3 is available
+      - echo "Installing pip and venv..."
+      - yum install -y python3-pip python3-venv  # Adds venv support
     build:
+      - python3 -m venv /app/venv  # Create venv in /app
+      - . /app/venv/bin/activate  # Activate venv
       - python3 -m pip install --upgrade pip
       - python3 -m pip install -r requirements.txt
     post-build:
       - echo "Streamlit version:"
-      - streamlit --version
+      - /app/venv/bin/streamlit --version  # Verify in venv
 run:
-  runtime-version: 3.11  # Locks to Python 3.11
-  command: python3 -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+  runtime-version: 3.11
+  command: . /app/venv/bin/activate && python3 -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0
   network:
     port: 8501
   env:
     - name: JWT_SECRET_KEY
-      value: "your_secure_jwt_secret_key_here"  # Replace with secure key (e.g., openssl rand -base64 32)
+      value: "your_secure_jwt_secret_key_here"
     - name: DB_HOST
       value: "your-database-host"
-    - name: PYTHONUNBUFFERED
-      value: "1"
+    # Add more env vars as needed
