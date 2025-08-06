@@ -15,12 +15,13 @@ build:
       - streamlit --version
 run:
   runtime-version: 3.11  # Locks to Python 3.11
-  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+  command: python3 -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0
   network:
     port: 8501
   env:
     - name: JWT_SECRET_KEY
       value: "your_secure_jwt_secret_key_here"  # Replace with secure key (e.g., openssl rand -base64 32)
     - name: DB_HOST
-      value: "your-database-host"  # Add your DB host
-    # Add more env vars as needed (e.g., DB_USER, DB_PASS)
+      value: "your-database-host"
+    - name: PYTHONUNBUFFERED
+      value: "1"
