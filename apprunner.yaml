@@ -1,17 +1,14 @@
 version: 1.0
-runtime: python311  # Matches your local env; alternatives: python39, python310, python312
-
-build:
-  commands:
-    build:
-      - pip install -r requirements.txt  # Installs your dependencies; add more commands if needed (e.g., for tests)
-
+runtime: python311  # Ensures Python 3.11
 run:
-  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0  # Starts Streamlit on App Runner's dynamic $PORT
+  runtime-version: 3.11  # Locks to 3.11 explicitly
+  pre-run:  # Install deps here to avoid loss in build stage
+    - pip3 install -r requirements.txt  # Use pip3 for Python 3.11
+  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0  # Or 'python3 application.py' if Flask
   network:
-    port: 8501  # Default Streamlit port; App Runner will map $PORT to this internally
-  env:  # Add any runtime environment variables your app needs (e.g., for database or secrets)
+    port: 8501  # Streamlit default
+  env:  # Add your env vars
     - name: JWT_SECRET_KEY
-      value: "your_secure_jwt_secret_key_here"  # Replace with a secure value (generate via openssl rand -base64 32)
+      value: "your_secure_jwt_secret_key_here"
     - name: DB_HOST
-      value: "your-database-host"  # Example; add more as needed from credentials.yaml
+      value: "your-database-host"
