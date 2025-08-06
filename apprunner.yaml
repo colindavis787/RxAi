@@ -5,8 +5,8 @@ build:
     pre-build:
       - echo "Python version:"
       - python3 --version
-      - echo "Installing pip and venv..."
-      - yum install -y python3-pip python3-venv  # Adds venv support
+      - echo "Installing pip..."
+      - yum install -y python3-pip  # Removed python3-venv, as it's not needed
     build:
       - python3 -m venv /app/venv  # Create venv in /app
       - . /app/venv/bin/activate  # Activate venv
