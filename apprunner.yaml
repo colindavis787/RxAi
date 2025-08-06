@@ -1,14 +1,23 @@
 version: 1.0
-runtime: python311  # Ensures Python 3.11
+runtime: python3
+build:
+  commands:
+    pre-build:
+      - echo "Python version:"
+      - python3 --version
+      - echo "Installing dependencies..."
+    build:
+      - python3 -m pip install --upgrade pip
+      - python3 -m pip install -r requirements.txt
+    post-build:
+      - echo "Streamlit version:"
+      - streamlit --version
 run:
-  runtime-version: 3.11  # Locks to 3.11 explicitly
-  pre-run:  # Install deps here to avoid loss in build stage
-    - pip3 install -r requirements.txt  # Use pip3 for Python 3.11
-  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0  # Or 'python3 application.py' if Flask
+  runtime-version: latest
+  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
   network:
-    port: 8501  # Streamlit default
-  env:  # Add your env vars
-    - name: JWT_SECRET_KEY
-      value: "your_secure_jwt_secret_key_here"
-    - name: DB_HOST
-      value: "your-database-host"
+    port: 8501
+    env: PORT
+  env:
+    - name: PORT
+      value: "8501"
