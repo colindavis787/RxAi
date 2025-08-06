@@ -1,11 +1,12 @@
 version: 1.0
-runtime: python3
+runtime: python311  # Explicitly set to Python 3.11
 build:
   commands:
     pre-build:
       - echo "Python version:"
       - python3 --version
-      - echo "Installing dependencies..."
+      - echo "Installing pip..."
+      - yum install -y python3-pip  # Ensures pip3 is available
     build:
       - python3 -m pip install --upgrade pip
       - python3 -m pip install -r requirements.txt
@@ -13,11 +14,13 @@ build:
       - echo "Streamlit version:"
       - streamlit --version
 run:
-  runtime-version: latest
+  runtime-version: 3.11  # Locks to Python 3.11
   command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
   network:
     port: 8501
-    env: PORT
   env:
-    - name: PORT
-      value: "8501"
+    - name: JWT_SECRET_KEY
+      value: "your_secure_jwt_secret_key_here"  # Replace with secure key (e.g., openssl rand -base64 32)
+    - name: DB_HOST
+      value: "your-database-host"  # Add your DB host
+    # Add more env vars as needed (e.g., DB_USER, DB_PASS)
