@@ -1,0 +1,17 @@
+version: 1.0
+runtime: python311  # Matches your local env; alternatives: python39, python310, python312
+
+build:
+  commands:
+    build:
+      - pip install -r requirements.txt  # Installs your dependencies; add more commands if needed (e.g., for tests)
+
+run:
+  command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0  # Starts Streamlit on App Runner's dynamic $PORT
+  network:
+    port: 8501  # Default Streamlit port; App Runner will map $PORT to this internally
+  env:  # Add any runtime environment variables your app needs (e.g., for database or secrets)
+    - name: JWT_SECRET_KEY
+      value: "your_secure_jwt_secret_key_here"  # Replace with a secure value (generate via openssl rand -base64 32)
+    - name: DB_HOST
+      value: "your-database-host"  # Example; add more as needed from credentials.yaml
