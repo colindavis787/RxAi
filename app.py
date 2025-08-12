@@ -1,10 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
+kfrom flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 import sqlite3
 import bcrypt
 import os
 import logging
-import webbrowser
-import argparse
 import jwt
 import datetime
 
@@ -207,12 +205,25 @@ def logout():
         logger.error(f"Error during logout: {str(e)}")
         return Response(f"Error during logout: {str(e)}", status=500)
 
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    if not session.get('authentication_status'):
+        return redirect(url_for('login'))
+    file = request.files.get('file')
+    if not file:
+        flash('No file uploaded.', 'danger')
+        return redirect(url_for('dashboard'))
+    temp_path = '/tmp/' + file.filename
+    file.save(temp_path)
+    from pharmacy_analyzer import main
+    df, messages, analysis_results, anomalies, chart_files, predictions = main(temp_path, inflation_rate=0.05)
+    os.remove(temp_path)
+    if df is None:
+        flash(messages, 'danger')
+        return redirect(url_for('dashboard'))
+    return render_template('analysis.html', messages=messages, analysis_results=analysis_results, 
+                           anomalies=anomalies.to_html() if not anomalies.empty else "No anomalies detected",
+                           chart_files=chart_files, predictions=predictions)
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run the Flask app with specified port and host.')
-    parser.add_argument('--port', type=int, default=5001, help='Port to run the Flask app on (default: 5001)')
-    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the Flask app on (default: 127.0.0.1)')
-    parser.add_argument('--open-browser', action='store_true', help='Automatically open the browser after starting the server')
-    args = parser.parse_args()
-    if args.open_browser:
-        webbrowser.open_new(f"http://{args.host}:{args.port}")
-    app.run(host=args.host, port=args.port, debug=True)
+    app.run(host='0.0.0.0', port=8501, debug=False)  # Production-ready; debug disabled
