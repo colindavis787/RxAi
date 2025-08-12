@@ -6,4 +6,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8501
 ENV PORT=8501
-CMD ["python3", "-m", "streamlit", "run", "app.py", "--server.port", "${PORT}", "--server.address", "0.0.0.0", "--global.developmentMode=false"]
+CMD gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 60 app:app
