@@ -1,4 +1,4 @@
-kfrom flask import Flask, render_template, request, redirect, url_for, session, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 import sqlite3
 import bcrypt
 import os
