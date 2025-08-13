@@ -6,6 +6,9 @@ import logging
 import jwt
 import datetime
 
+# Disable watchdog logging to reduce noise
+logging.getLogger('watchdog').setLevel(logging.WARNING)
+
 # Configure logging to output to stderr
 logging.basicConfig(
     level=logging.DEBUG,
@@ -14,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static')  # Remove hardcoded template_folder
+app = Flask(__name__, static_folder='static', template_folder='templates')  # Explicitly set template folder
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
@@ -43,11 +46,15 @@ def load_users():
         logger.error(f"Failed to load users from database: {str(e)}", exc_info=True)
         return {}
 
+@app.route('/health')
+def health():
+    return "OK", 200  # Simple health check endpoint for ELB
+
 @app.route('/')
 def index():
     try:
         logger.debug("Attempting to render index.html")
-        result = render_template('index.html')  # Flask will look in 'website/templates/' by default
+        result = render_template('index.html')
         logger.debug("Successfully rendered index.html")
         return result
     except Exception as e:
