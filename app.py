@@ -6,18 +6,18 @@ import logging
 import jwt
 import datetime
 
-# Disable watchdog logging to reduce noise
+# Disable watchdog logging
 logging.getLogger('watchdog').setLevel(logging.WARNING)
 
-# Configure logging to output to stderr
+# Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
-    handlers=[logging.StreamHandler()],  # Explicitly use stderr
+    handlers=[logging.StreamHandler()],
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='static', template_folder='website/templates')  # Explicitly set template folder
+app = Flask(__name__, static_folder='website/static', template_folder='website/templates')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', '2f0782073d00457d2c4ed7576e6771c8')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')
 
@@ -48,7 +48,7 @@ def load_users():
 
 @app.route('/health')
 def health():
-    return "OK", 200  # Simple health check endpoint for ELB
+    return "OK", 200
 
 @app.route('/')
 def index():
