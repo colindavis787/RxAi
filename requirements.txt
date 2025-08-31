@@ -1,9 +1,4 @@
-streamlit==1.45.1
-pandas==2.2.3
-numpy==1.26.4
-matplotlib==3.8.4
 seaborn==0.13.2
-scikit-learn==1.5.2
 openai==1.93.2
 pyyaml==6.0.2
 bcrypt==4.3.0
@@ -12,14 +7,12 @@ cryptography==45.0.5
 pyjwt==2.10.1
 psycopg[binary]==3.2.9
 openpyxl==3.1.5
-plotly==5.24.1
 tensorflow==2.16.2
 python-dotenv==1.1.1
 altair==5.5.0
 annotated-types==0.7.0
 anyio==4.9.0
 attrs==25.3.0
-bcrypt==4.3.0
 blinker==1.9.0
 boto3==1.35.42
 botocore==1.35.99
@@ -55,8 +48,6 @@ MarkupSafe==3.0.2
 matplotlib==3.10.3
 narwhals==1.41.0
 numpy==1.26.4
-openai==1.82.0
-openpyxl==3.1.5
 packaging==24.2
 pandas==2.2.3
 patsy==1.0.1
@@ -69,13 +60,10 @@ pycparser==2.22
 pydantic==2.11.5
 pydantic_core==2.33.2
 pydeck==0.9.1
-PyJWT==2.10.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 pytz==2025.2
-PyYAML==6.0.2
 referencing==0.36.2
-requests==2.32.3
 rpds-py==0.25.1
 s3transfer==0.10.4
 scikit-learn==1.6.1
