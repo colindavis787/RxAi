@@ -1,0 +1,12 @@
+*.bak*
+*.docx
+*.rtf
+*.zip
+*.pyc
+__pycache__
+.DS_Store
+.env
+*.pem
+*.pkg
+*.json
+~$*
