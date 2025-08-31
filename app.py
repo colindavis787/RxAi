@@ -27,20 +27,25 @@ logging.basicConfig(level=logging.DEBUG)
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
 
 # Load user credentials from database
+from urllib.parse import urlparse, parse_qs
+
 def load_users():
     try:
         url = os.getenv('DATABASE_URL')
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
+        parsed_url = urlparse(url)
+        # Extract database name from path, ignoring query parameters
+        dbname = parsed_url.path[1:]  # Remove leading '/' from path
         conninfo = {
-            'dbname': url.split('/')[3],
-            'user': url.split('//')[1].split(':')[0],
-            'password': url.split('//')[1].split(':')[1].split('@')[0],
-            'host': url.split('@')[1].split(':')[0],
-            'port': url.split(':')[3].split('/')[0],
-            'sslmode': 'require'
+            'dbname': dbname,
+            'user': parsed_url.username,
+            'password': parsed_url.password,
+            'host': parsed_url.hostname,
+            'port': parsed_url.port,
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['prefer'])[0]  # Default to 'prefer' if not set
         }
-        logger.debug("Connecting to Postgres database")
+        logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
         conn = psycopg.connect(**conninfo)
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
             cursor.execute("SELECT username, name, password FROM users")
@@ -53,8 +58,8 @@ def load_users():
         return users
     except Exception as e:
         logger.error(f"Failed to load users from database: {str(e)}")
-        st.error(f"Failed to load users: {str(e)}")
-        return {}
+        st.error(f"Database connection failed: {str(e)}. Using empty user list.")
+        return {}  # Default to empty dict so app starts
 
 # Create claims table
 def create_claims_table():
