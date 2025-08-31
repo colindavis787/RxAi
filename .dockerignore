@@ -1,0 +1,12 @@
+.git
+pharmacy_tool_env_311/
+*.db
+*.xlsx
+*.csv
+*.png
+*.zip
+*.dylib
+__pycache__/
+*.pem
+*.sql
+*.bak

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analysis Results</title>
+</head>
+<body>
+    <h1>Analysis Results</h1>
+    <p>{{ messages }}</p>
+    
+    {% if analysis_results %}
+    <h2>Analysis Summary</h2>
+    <ul>
+        {% for key, value in analysis_results.items() %}
+        <li><strong>{{ key }}:</strong> {{ value }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    <h2>Anomalies</h2>
+    {{ anomalies | safe }}
+    
+    {% if chart_files %}
+    <h2>Charts</h2>
+    <ul>
+        {% for chart in chart_files %}
+        <li><img src="https://{{ bucket_name }}.s3.amazonaws.com/{{ chart }}" alt="{{ chart }}" style="width: 500px;"></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    {% if predictions %}
+    <h2>Predictions</h2>
+    <ul>
+        {% for key, value in predictions.items() %}
+        <li><strong>{{ key }}:</strong> {{ value }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>

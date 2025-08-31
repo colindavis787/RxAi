@@ -1,0 +1,28 @@
+version: 1.0
+runtime: python311
+build:
+  commands:
+    pre-build:
+      - echo "Python version:"
+      - python3 --version
+      - echo "Installing pip..."
+      - yum install -y python3-pip
+    build:
+      - python3 -m venv /app/venv
+      - /app/venv/bin/pip3 install --upgrade pip
+      - /app/venv/bin/pip3 install --target /app/packages -r requirements.txt
+    post-build:
+      - echo "Streamlit version:"
+      - /app/venv/bin/python3 -m streamlit --version
+run:
+  runtime-version: 3.11
+  command: . /app/venv/bin/activate && /app/venv/bin/python3 -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --global.developmentMode=false
+  network:
+    port: 8501
+  env:
+    - name: PYTHONPATH
+      value: "/app/packages:/app/venv/lib/python3.11/site-packages"
+    - name: JWT_SECRET_KEY
+      value: "your_secure_jwt_secret_key_here"
+    - name: DB_HOST
+      value: "your-database-host"

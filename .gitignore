@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.bak*
 *.docx
 *.rtf
@@ -11,3 +12,39 @@ __pycache__
 *.json
 ~$*
 salt.txt
+=======
+pharmacy_tool_env/
+*.db
+*.xlsx
+*.key
+*~
+*.docx
+*.rtf
+*.csv
+*.png
+*.bak
+
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+credentials.yaml
+.streamlit/secrets.toml
+encryption_key.key
+claims_history.db
+*.csv
+*.png
+*.xlsx
+credentials.yaml
+pharmacy_tool_env_311/
+pharmacy_claims_analyzer.zip
+*.dylib
+pharmacy_tool_env_311/ # Exclude entire env dir
+pharmacy_claims_analyzer.zip
+*.dylib
+pharmacy_tool_env_311/ # Exclude entire env dir
+pharmacy_tool_env_311/
+*.zip
+*.dylib
+>>>>>>> 41c87d72dd7eb52f51936fb2df2f7a4a7b87eb66

@@ -1,0 +1,100 @@
+2025-06-01T23:08:01.000000+00:00 app[api]: Build succeeded
+2025-06-01T23:08:21.397782+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=e2755e90-8559-483b-acac-7255d6517dec fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:08:21.997857+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=a5ca54b7-057d-4775-a66c-9384c993c0a0 fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:08:22.121178+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/favicon.ico" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=fd8ee23a-4f33-4b7c-b112-096dde4bfe28 fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:15:39.601756+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=1889225d-307a-46d9-849c-ec8b99ac1267 fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:15:39.857660+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/favicon.ico" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=fd4162c0-910b-4e8a-a035-fb89d0c235b6 fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:25:59.000000+00:00 app[api]: Build started by user colindavis787@gmail.com
+2025-06-01T23:26:49.123120+00:00 app[api]: Deploy a4bfe8ca by user colindavis787@gmail.com
+2025-06-01T23:26:49.123120+00:00 app[api]: Release v6 created by user colindavis787@gmail.com
+2025-06-01T23:27:28.000000+00:00 app[api]: Build succeeded
+2025-06-01T23:27:48.060397+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=e044118f-1f44-4237-8d5f-ec45f6fa9370 fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:27:48.235919+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/apple-touch-icon-precomposed.png" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=b5981edf-b581-408a-aa56-401ab3b7c02e fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-01T23:27:48.446795+00:00 heroku[router]: at=error code=H14 desc="No web processes running" method=GET path="/apple-touch-icon.png" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=04e21811-b3ac-4edb-8ce5-df788b4deedd fwd="73.230.72.92" dyno= connect= service= status=503 bytes= protocol=https
+2025-06-02T01:08:10.000000+00:00 app[api]: Build started by user colindavis787@gmail.com
+2025-06-02T01:08:39.716916+00:00 app[api]: Release v7 created by user colindavis787@gmail.com
+2025-06-02T01:08:39.716916+00:00 app[api]: Deploy 113474c9 by user colindavis787@gmail.com
+2025-06-02T01:08:43.000000+00:00 app[api]: Build succeeded
+2025-06-02T01:09:15.795524+00:00 app[api]: Set FLASK_SECRET_KEY config vars by user colindavis787@gmail.com
+2025-06-02T01:09:15.795524+00:00 app[api]: Release v8 created by user colindavis787@gmail.com
+2025-06-02T01:18:42.000000+00:00 app[api]: Build started by user colindavis787@gmail.com
+2025-06-02T01:18:54.891952+00:00 app[api]: Release v9 created by user colindavis787@gmail.com
+2025-06-02T01:18:54.891952+00:00 app[api]: Deploy 43a978fd by user colindavis787@gmail.com
+2025-06-02T01:18:54.904535+00:00 app[api]: Scaled to web@1:Basic by user colindavis787@gmail.com
+2025-06-02T01:18:55.936157+00:00 heroku[web.1]: Starting process with command `gunicorn -w 4 -b 0.0.0.0:53840 website.app:app`
+2025-06-02T01:18:56.444718+00:00 app[web.1]: Python buildpack: Detected 512 MB available memory and 8 CPU cores.
+2025-06-02T01:18:56.444797+00:00 app[web.1]: Python buildpack: Defaulting WEB_CONCURRENCY to 2 based on the available memory.
+2025-06-02T01:18:56.556507+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [2] [INFO] Starting gunicorn 23.0.0
+2025-06-02T01:18:56.556754+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [2] [INFO] Listening at: http://0.0.0.0:53840 (2)
+2025-06-02T01:18:56.556778+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [2] [INFO] Using worker: sync
+2025-06-02T01:18:56.558480+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [8] [INFO] Booting worker with pid: 8
+2025-06-02T01:18:56.576200+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [9] [INFO] Booting worker with pid: 9
+2025-06-02T01:18:56.605614+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [10] [INFO] Booting worker with pid: 10
+2025-06-02T01:18:56.655067+00:00 app[web.1]: DEBUG:website.app:Attempting to load credentials.yaml
+2025-06-02T01:18:56.655121+00:00 app[web.1]: ERROR:website.app:Failed to load credentials.yaml: [Errno 2] No such file or directory: '/app/website/.streamlit/credentials.yaml'
+2025-06-02T01:18:56.663815+00:00 app[web.1]: [2025-06-02 01:18:56 +0000] [11] [INFO] Booting worker with pid: 11
+2025-06-02T01:18:56.673413+00:00 app[web.1]: DEBUG:website.app:Attempting to load credentials.yaml
+2025-06-02T01:18:56.673464+00:00 app[web.1]: ERROR:website.app:Failed to load credentials.yaml: [Errno 2] No such file or directory: '/app/website/.streamlit/credentials.yaml'
+2025-06-02T01:18:56.698481+00:00 app[web.1]: DEBUG:website.app:Attempting to load credentials.yaml
+2025-06-02T01:18:56.698524+00:00 app[web.1]: ERROR:website.app:Failed to load credentials.yaml: [Errno 2] No such file or directory: '/app/website/.streamlit/credentials.yaml'
+2025-06-02T01:18:56.758730+00:00 app[web.1]: DEBUG:website.app:Attempting to load credentials.yaml
+2025-06-02T01:18:56.758773+00:00 app[web.1]: ERROR:website.app:Failed to load credentials.yaml: [Errno 2] No such file or directory: '/app/website/.streamlit/credentials.yaml'
+2025-06-02T01:18:57.092449+00:00 heroku[web.1]: State changed from starting to up
+2025-06-02T01:19:00.000000+00:00 app[api]: Build succeeded
+2025-06-02T01:20:01.322440+00:00 app[web.1]: DEBUG:website.app:Attempting to render index.html
+2025-06-02T01:20:01.325102+00:00 app[web.1]: DEBUG:website.app:Successfully rendered index.html
+2025-06-02T01:20:01.325849+00:00 app[web.1]: 10.1.29.52 - - [02/Jun/2025:01:20:01 +0000] "GET / HTTP/1.1" 200 854 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:01.325954+00:00 heroku[router]: at=info method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=771cbc5b-e73f-4586-84ce-bb3a01afc354 fwd="73.230.72.92" dyno=web.1 connect=0ms service=6ms status=200 bytes=1008 protocol=https
+2025-06-02T01:20:01.384564+00:00 app[web.1]: 10.1.29.52 - - [02/Jun/2025:01:20:01 +0000] "GET /static/css/styles.css HTTP/1.1" 200 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:01.384810+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=6155d42d-c478-4c53-bfd9-6fb9beec4441 fwd="73.230.72.92" dyno=web.1 connect=0ms service=2ms status=200 bytes=470 protocol=https
+2025-06-02T01:20:01.521785+00:00 app[web.1]: 10.1.29.61 - - [02/Jun/2025:01:20:01 +0000] "GET /static/js/script.js HTTP/1.1" 200 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:01.522350+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=27a0a149-daaf-4456-9598-d8028b3b8507 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=200 bytes=382 protocol=https
+2025-06-02T01:20:13.579074+00:00 app[web.1]: DEBUG:website.app:Accessing login route
+2025-06-02T01:20:13.582661+00:00 app[web.1]: 10.1.50.139 - - [02/Jun/2025:01:20:13 +0000] "GET /login HTTP/1.1" 200 1195 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:13.583131+00:00 heroku[router]: at=info method=GET path="/login" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=9197ef17-3c11-4216-bbe3-35e0b934a387 fwd="73.230.72.92" dyno=web.1 connect=0ms service=6ms status=200 bytes=1350 protocol=https
+2025-06-02T01:20:13.639665+00:00 app[web.1]: 10.1.29.61 - - [02/Jun/2025:01:20:13 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:13.639853+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=92531c1b-f132-4022-8e0c-034ea1cd5e11 fwd="73.230.72.92" dyno=web.1 connect=0ms service=2ms status=304 bytes=215 protocol=https
+2025-06-02T01:20:13.643838+00:00 app[web.1]: 10.1.29.52 - - [02/Jun/2025:01:20:13 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:13.644032+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=1a239738-4b58-4470-859b-7918db746fd1 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:20:22.823777+00:00 app[web.1]: DEBUG:website.app:Accessing login route
+2025-06-02T01:20:22.824228+00:00 app[web.1]: DEBUG:website.app:Login attempt for username: admin
+2025-06-02T01:20:22.824277+00:00 app[web.1]: WARNING:website.app:Invalid login credentials
+2025-06-02T01:20:22.827499+00:00 app[web.1]: 10.1.50.139 - - [02/Jun/2025:01:20:22 +0000] "POST /login HTTP/1.1" 200 1195 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:22.827858+00:00 heroku[router]: at=info method=POST path="/login" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=9537963a-db02-4a3c-afd5-35780c545634 fwd="73.230.72.92" dyno=web.1 connect=0ms service=6ms status=200 bytes=1522 protocol=https
+2025-06-02T01:20:22.879866+00:00 app[web.1]: 10.1.29.61 - - [02/Jun/2025:01:20:22 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:22.880302+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=b435b390-571d-428b-97d2-9459aaafbfac fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=215 protocol=https
+2025-06-02T01:20:22.884530+00:00 app[web.1]: 10.1.29.52 - - [02/Jun/2025:01:20:22 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:22.884976+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=56761b4d-fbf9-4181-90d9-a4000e5510c3 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:20:49.101823+00:00 app[web.1]: DEBUG:website.app:Accessing login route
+2025-06-02T01:20:49.102004+00:00 app[web.1]: DEBUG:website.app:Login attempt for username: admin
+2025-06-02T01:20:49.102046+00:00 app[web.1]: WARNING:website.app:Invalid login credentials
+2025-06-02T01:20:49.102732+00:00 app[web.1]: 10.1.50.139 - - [02/Jun/2025:01:20:49 +0000] "POST /login HTTP/1.1" 200 1195 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:49.103047+00:00 heroku[router]: at=info method=POST path="/login" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=61a7fef3-21ac-4381-85ad-7dac317ca8d7 fwd="73.230.72.92" dyno=web.1 connect=0ms service=2ms status=200 bytes=1536 protocol=https
+2025-06-02T01:20:49.152584+00:00 app[web.1]: 10.1.29.61 - - [02/Jun/2025:01:20:49 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:49.152826+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=543697f1-4d86-4819-8a1d-096db94a29e6 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=215 protocol=https
+2025-06-02T01:20:49.156608+00:00 app[web.1]: 10.1.29.52 - - [02/Jun/2025:01:20:49 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:20:49.156915+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=abea2bb4-efc8-4877-9e79-2fe2777056ff fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:57:40.364846+00:00 app[web.1]: DEBUG:website.app:Attempting to render index.html
+2025-06-02T01:57:40.365647+00:00 app[web.1]: DEBUG:website.app:Successfully rendered index.html
+2025-06-02T01:57:40.366008+00:00 app[web.1]: 10.1.61.129 - - [02/Jun/2025:01:57:40 +0000] "GET / HTTP/1.1" 200 854 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:40.366360+00:00 heroku[router]: at=info method=GET path="/" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=e8bb0c8f-ce82-491c-9d26-5723e937ad1c fwd="73.230.72.92" dyno=web.1 connect=0ms service=2ms status=200 bytes=1008 protocol=https
+2025-06-02T01:57:40.450517+00:00 app[web.1]: 10.1.61.129 - - [02/Jun/2025:01:57:40 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:40.450900+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=e49ae566-e009-409b-8bff-03c6f3b58b25 fwd="73.230.72.92" dyno=web.1 connect=0ms service=4ms status=304 bytes=215 protocol=https
+2025-06-02T01:57:40.574568+00:00 app[web.1]: 10.1.17.82 - - [02/Jun/2025:01:57:40 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:40.574872+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=d5597adc-45da-4473-b377-1956b1d9b917 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:57:44.090204+00:00 app[web.1]: DEBUG:website.app:Accessing login route
+2025-06-02T01:57:44.093175+00:00 app[web.1]: 10.1.17.82 - - [02/Jun/2025:01:57:44 +0000] "GET /login HTTP/1.1" 200 1195 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:44.093550+00:00 heroku[router]: at=info method=GET path="/login" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=8b754308-1a71-4edf-b21b-5e970d9de85a fwd="73.230.72.92" dyno=web.1 connect=0ms service=4ms status=200 bytes=1350 protocol=https
+2025-06-02T01:57:44.142821+00:00 app[web.1]: 10.1.61.129 - - [02/Jun/2025:01:57:44 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:44.143158+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=5927d43d-7cdf-49f2-b2df-709b687dde29 fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=215 protocol=https
+2025-06-02T01:57:44.145074+00:00 app[web.1]: 10.1.17.82 - - [02/Jun/2025:01:57:44 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:44.145328+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=daa63d50-be36-42f9-ab69-846aed56853a fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:57:56.589080+00:00 app[web.1]: DEBUG:website.app:Accessing login route
+2025-06-02T01:57:56.589493+00:00 app[web.1]: DEBUG:website.app:Login attempt for username: admin
+2025-06-02T01:57:56.589542+00:00 app[web.1]: WARNING:website.app:Invalid login credentials
+2025-06-02T01:57:56.591542+00:00 app[web.1]: 10.1.17.82 - - [02/Jun/2025:01:57:56 +0000] "POST /login HTTP/1.1" 200 1195 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:56.591787+00:00 heroku[router]: at=info method=POST path="/login" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=414a86ef-a8be-4281-abfb-ed71d7b30b67 fwd="73.230.72.92" dyno=web.1 connect=0ms service=3ms status=200 bytes=1536 protocol=https
+2025-06-02T01:57:56.638439+00:00 app[web.1]: 10.1.17.82 - - [02/Jun/2025:01:57:56 +0000] "GET /static/js/script.js HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:56.638557+00:00 heroku[router]: at=info method=GET path="/static/js/script.js" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=1e4835ff-024c-4112-9c8e-86cdc821047e fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=213 protocol=https
+2025-06-02T01:57:56.639422+00:00 app[web.1]: 10.1.61.129 - - [02/Jun/2025:01:57:56 +0000] "GET /static/css/styles.css HTTP/1.1" 304 0 "https://pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com/login" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+2025-06-02T01:57:56.639756+00:00 heroku[router]: at=info method=GET path="/static/css/styles.css" host=pharmacy-claims-analyzer-0f4c96d1e50c.herokuapp.com request_id=06644830-6c8f-4a25-9657-1f83a948db0e fwd="73.230.72.92" dyno=web.1 connect=0ms service=1ms status=304 bytes=215 protocol=https
