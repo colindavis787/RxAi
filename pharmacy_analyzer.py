@@ -23,6 +23,22 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 s3 = boto3.client('s3')
 bucket_name = os.getenv('S3_BUCKET', 'rxai-phi-854611169949')
 
+# Hash SSN for privacy
+def hash_ssn(ssn):
+    try:
+        salt = os.getenv('SALT', 'default_salt_1234567890').encode('utf-8')
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(str(ssn).encode('utf-8')))
+        return key.decode('utf-8')
+    except Exception as e:
+        print(f"Error hashing SSN: {str(e)}")
+        return str(ssn)
+
 # Database connection
 def get_db_connection():
     try:
