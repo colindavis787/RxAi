@@ -137,13 +137,13 @@ def store_claims(df, file_name):
         print(f"Error storing claims: {str(e)}")
         return None
 
-# Load the Excel file from S3
 def load_claims_file(file_path):
     try:
-        temp_file = "/tmp/" + os.path.basename(file_path)
-        s3.download_file(bucket_name, file_path, temp_file)
-        df = pd.read_excel(temp_file, sheet_name=0)
-        os.remove(temp_file)
+        # Check if file_path is a string (local path) or a file-like object
+        if isinstance(file_path, str):
+            df = pd.read_excel(file_path)
+        else:  # Assume file-like object from st.file_uploader
+            df = pd.read_excel(file_path)
         return df, f"File loaded successfully. Number of rows: {len(df)}, Columns: {list(df.columns)}"
     except Exception as e:
         return None, f"Error loading file: {str(e)}"
