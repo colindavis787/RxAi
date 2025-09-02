@@ -6,6 +6,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8501
 ENV PORT=8501
-# Disable development mode
-ENV FLASK_ENV=production
-CMD gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 60 app:app
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
