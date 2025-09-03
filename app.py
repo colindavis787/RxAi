@@ -23,6 +23,21 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+# Limit file watching to specific files
+os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
+
+# Certificate copy logic
+import shutil
+cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
+cert_dest = "/home/appuser/.postgresql/root.crt"
+if not os.path.exists("/home/appuser/.postgresql"):
+    os.makedirs("/home/appuser/.postgresql")
+if os.path.exists(cert_source):
+    shutil.copy(cert_source, cert_dest)
+    print(f"Copied certificate to {cert_dest}")
+else:
+    print(f"Certificate not found at {cert_source}")
+
 # JWT secret key
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
 
@@ -120,11 +135,11 @@ def store_claims(df, upload_id):
     try:
         url = os.getenv('DATABASE_URL')
         conn = psycopg.connect(dbname=url.split('/')[3],
-                              user=url.split('//')[1].split(':')[0],
-                              password=url.split('//')[1].split(':')[1].split('@')[0],
-                              host=url.split('@')[1].split(':')[0],
-                              port=url.split(':')[3].split('/')[0],
-                              sslmode='require')
+                             user=url.split('//')[1].split(':')[0],
+                             password=url.split('//')[1].split(':')[1].split('@')[0],
+                             host=url.split('@')[1].split(':')[0],
+                             port=url.split(':')[3].split('/')[0],
+                             sslmode='require')
         cursor = conn.cursor()
         ssn_col = next(col for col in df.columns if col.lower() in ['ssn', 'social security number'])
         date_col = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
@@ -222,21 +237,21 @@ if st.session_state.authenticated:
         <style>
         .main { background-color: #FFFFFF; padding: 20px; border-radius: 10px; }
         .stButton>button { background-color: #003087; color: white; border-radius: 5px; }
-        .stDataFrame { 
-            max-height: 400px; 
-            overflow-x: auto; 
-            width: 100%; 
-            min-width: 1000px; 
+        .stDataFrame {
+            max-height: 400px;
+            overflow-x: auto;
+            width: 100%;
+            min-width: 1000px;
         }
-        .stDataFrame table { 
-            width: 100%; 
-            table-layout: auto; 
+        .stDataFrame table {
+            width: 100%;
+            table-layout: auto;
         }
-        .stDataFrame th, .stDataFrame td { 
-            white-space: normal; 
-            text-align: left; 
-            word-wrap: break-word; 
-            max-width: 300px; 
+        .stDataFrame th, .stDataFrame td {
+            white-space: normal;
+            text-align: left;
+            word-wrap: break-word;
+            max-width: 300px;
         }
         </style>
         """,
