@@ -23,6 +23,9 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+print(f"Current user: {os.getlogin()}")
+print(f"Current directory: {os.getcwd()}")
+
 # Limit file watching to specific files
 os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
 
