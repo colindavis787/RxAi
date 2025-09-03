@@ -1,50 +1,41 @@
-<<<<<<< HEAD
+# Ignore Python cache and build artifacts
+*.pyc
+__pycache__/
+
+# Ignore macOS metadata
+.DS_Store
+
+# Ignore environment files and virtual environments
+.env
+pharmacy_tool_env_311/
+pharmacy_tool_env/
+
+# Ignore office and backup files
 *.bak*
 *.docx
 *.rtf
-*.zip
-*.pyc
-__pycache__
-.DS_Store
-.env
-*.pem
-*.pkg
-*.json
 ~$*
-salt.txt
-=======
-pharmacy_tool_env/
+
+# Ignore zip and package files
+*.zip
+*.pkg
+*.dylib
+
+# Ignore database and data files
 *.db
 *.xlsx
-*.key
-*~
-*.docx
-*.rtf
 *.csv
 *.png
-*.bak
 
-
-# Elastic Beanstalk Files
+# Ignore Elastic Beanstalk and secret files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
-credentials.yaml
 .streamlit/secrets.toml
+credentials.yaml
 encryption_key.key
 claims_history.db
-*.csv
-*.png
-*.xlsx
-credentials.yaml
-pharmacy_tool_env_311/
 pharmacy_claims_analyzer.zip
-*.dylib
-pharmacy_tool_env_311/ # Exclude entire env dir
-pharmacy_claims_analyzer.zip
-*.dylib
-pharmacy_tool_env_311/ # Exclude entire env dir
-pharmacy_tool_env_311/
-*.zip
-*.dylib
->>>>>>> 41c87d72dd7eb52f51936fb2df2f7a4a7b87eb66
+
+# Allow us-east-1-bundle.pem (remove from ignore)
+!us-east-1-bundle.pem
