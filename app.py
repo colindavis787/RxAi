@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.DEBUG)
 import pwd
 user_env = os.environ.get('USER')
 user_pwd = pwd.getpwuid(os.getuid())[0]
-user = user_env or user_pwd
+user = "adminuser"  # Force to adminuser based on venv path
 logger.debug(f"Detected users: env={user_env}, pwd={user_pwd}, selected={user}")
 print(f"Current user: {user}")
 print(f"Current directory: {os.getcwd()}")
@@ -35,7 +35,7 @@ print(f"Current directory: {os.getcwd()}")
 # Limit file watching to specific files
 os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
 
-# Certificate copy logic with debug
+# Certificate copy logic with debug and permissions
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
 cert_dest = f"/home/{user}/.postgresql/root.crt"  # Dynamic user path
@@ -45,7 +45,8 @@ if not os.path.exists(f"/home/{user}/.postgresql"):
     logger.debug(f"Created directory: /home/{user}/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
-    logger.debug(f"Copied certificate from {cert_source} to {cert_dest}")
+    os.chmod(cert_dest, 0o644)  # Set readable permissions
+    logger.debug(f"Copied certificate from {cert_source} to {cert_dest} with permissions 644")
 else:
     logger.error(f"Certificate not found at {cert_source}")
 
