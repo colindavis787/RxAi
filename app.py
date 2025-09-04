@@ -35,10 +35,10 @@ os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with
 # Certificate copy logic with debug
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
-cert_dest = "/home/appuser/.postgresql/root.crt"
-if not os.path.exists("/home/appuser/.postgresql"):
-    os.makedirs("/home/appuser/.postgresql")
-    logger.debug(f"Created directory: /home/appuser/.postgresql")
+cert_dest = f"/home/{user}/.postgresql/root.crt"  # Dynamic user path
+if not os.path.exists(f"/home/{user}/.postgresql"):
+    os.makedirs(f"/home/{user}/.postgresql")
+    logger.debug(f"Created directory: /home/{user}/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
     logger.debug(f"Copied certificate from {cert_source} to {cert_dest}")
