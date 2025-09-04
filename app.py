@@ -10,12 +10,13 @@ import jwt
 import datetime
 from pathlib import Path
 import logging
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, parse_qs  # Added parse_qs
 import psycopg
 import plotly.express as px
 from dotenv import load_dotenv
 import tensorflow as tf
 from lstm_model import predict_future_meds, fetch_claims_data
+import pwd
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +25,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # Enhanced debug prints to verify user and directory
-import pwd
 user_env = os.environ.get('USER')
 user_pwd = pwd.getpwuid(os.getuid())[0]
 user = "adminuser"  # Force to adminuser based on venv path
@@ -41,7 +41,7 @@ cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
 cert_dest = f"/tmp/.postgresql/root.crt"  # Use /tmp for writable access
 logger.debug(f"Setting certificate destination to: {cert_dest}")
 if not os.path.exists("/tmp/.postgresql"):
-    os.makedirs("/tmp/.postgresql")
+    os.makedirs("/tmp/.postgresql", exist_ok=True)  # Added exist_ok=True
     logger.debug(f"Created directory: /tmp/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
