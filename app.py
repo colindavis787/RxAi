@@ -23,9 +23,12 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-# Debug prints to verify user and directory (workaround for os.getlogin)
+# Enhanced debug prints to verify user and directory
 import pwd
-user = os.environ.get('USER') or pwd.getpwuid(os.getuid())[0]
+user_env = os.environ.get('USER')
+user_pwd = pwd.getpwuid(os.getuid())[0]
+user = user_env or user_pwd
+logger.debug(f"Detected users: env={user_env}, pwd={user_pwd}, selected={user}")
 print(f"Current user: {user}")
 print(f"Current directory: {os.getcwd()}")
 
@@ -36,6 +39,7 @@ os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
 cert_dest = f"/home/{user}/.postgresql/root.crt"  # Dynamic user path
+logger.debug(f"Setting certificate destination to: {cert_dest}")
 if not os.path.exists(f"/home/{user}/.postgresql"):
     os.makedirs(f"/home/{user}/.postgresql")
     logger.debug(f"Created directory: /home/{user}/.postgresql")
