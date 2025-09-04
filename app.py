@@ -35,14 +35,14 @@ print(f"Current directory: {os.getcwd()}")
 # Limit file watching to specific files
 os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
 
-# Certificate copy logic with debug and permissions
+# Certificate copy logic with debug and writable path
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
-cert_dest = f"/home/{user}/.postgresql/root.crt"  # Dynamic user path
+cert_dest = f"/tmp/.postgresql/root.crt"  # Use /tmp for writable access
 logger.debug(f"Setting certificate destination to: {cert_dest}")
-if not os.path.exists(f"/home/{user}/.postgresql"):
-    os.makedirs(f"/home/{user}/.postgresql")
-    logger.debug(f"Created directory: /home/{user}/.postgresql")
+if not os.path.exists("/tmp/.postgresql"):
+    os.makedirs("/tmp/.postgresql")
+    logger.debug(f"Created directory: /tmp/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
     os.chmod(cert_dest, 0o644)  # Set readable permissions
@@ -70,7 +70,8 @@ def load_users():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['prefer'])[0]  # Default to 'prefer' if not set
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['prefer'])[0],  # Default to 'prefer'
+            'sslcert': cert_dest  # Specify the certificate path
         }
         logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
         conn = psycopg.connect(**conninfo)
@@ -151,7 +152,8 @@ def store_claims(df, upload_id):
                              password=url.split('//')[1].split(':')[1].split('@')[0],
                              host=url.split('@')[1].split(':')[0],
                              port=url.split(':')[3].split('/')[0],
-                             sslmode='require')
+                             sslmode='require',
+                             sslcert=cert_dest)
         cursor = conn.cursor()
         ssn_col = next(col for col in df.columns if col.lower() in ['ssn', 'social security number'])
         date_col = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
