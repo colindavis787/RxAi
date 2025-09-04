@@ -23,23 +23,27 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-print(f"Current user: {os.getlogin()}")
+# Debug prints to verify user and directory (workaround for os.getlogin)
+import pwd
+user = os.environ.get('USER') or pwd.getpwuid(os.getuid())[0]
+print(f"Current user: {user}")
 print(f"Current directory: {os.getcwd()}")
 
 # Limit file watching to specific files
 os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
 
-# Certificate copy logic
+# Certificate copy logic with debug
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
 cert_dest = "/home/appuser/.postgresql/root.crt"
 if not os.path.exists("/home/appuser/.postgresql"):
     os.makedirs("/home/appuser/.postgresql")
+    logger.debug(f"Created directory: /home/appuser/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
-    print(f"Copied certificate to {cert_dest}")
+    logger.debug(f"Copied certificate from {cert_source} to {cert_dest}")
 else:
-    print(f"Certificate not found at {cert_source}")
+    logger.error(f"Certificate not found at {cert_source}")
 
 # JWT secret key
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
