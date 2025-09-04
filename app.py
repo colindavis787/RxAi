@@ -10,7 +10,7 @@ import jwt
 import datetime
 from pathlib import Path
 import logging
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 import psycopg
 import plotly.express as px
 from dotenv import load_dotenv
@@ -54,15 +54,12 @@ else:
 JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
 
 # Load user credentials from database
-from urllib.parse import urlparse, parse_qs
-
 def load_users():
     try:
         url = os.getenv('DATABASE_URL')
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
         parsed_url = urlparse(url)
-        # Extract database name from path, ignoring query parameters
         dbname = parsed_url.path[1:]  # Remove leading '/' from path
         conninfo = {
             'dbname': dbname,
@@ -70,10 +67,11 @@ def load_users():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['prefer'])[0],  # Default to 'prefer'
-            'sslcert': cert_dest  # Specify the certificate path
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],  # Default to verify-full
+            'sslrootcert': cert_dest  # Use root certificate for server verification
         }
         logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
+        logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")  # Debug certificate presence
         conn = psycopg.connect(**conninfo)
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
             cursor.execute("SELECT username, name, password FROM users")
@@ -95,7 +93,18 @@ def create_claims_table():
         url = os.getenv('DATABASE_URL')
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
-        conn = psycopg.connect(url)
+        parsed_url = urlparse(url)
+        dbname = parsed_url.path[1:]
+        conninfo = {
+            'dbname': dbname,
+            'user': parsed_url.username,
+            'password': parsed_url.password,
+            'host': parsed_url.hostname,
+            'port': parsed_url.port,
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],
+            'sslrootcert': cert_dest
+        }
+        conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS claims (
@@ -127,7 +136,18 @@ def verify_claims_table():
         url = os.getenv('DATABASE_URL')
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
-        conn = psycopg.connect(url)
+        parsed_url = urlparse(url)
+        dbname = parsed_url.path[1:]
+        conninfo = {
+            'dbname': dbname,
+            'user': parsed_url.username,
+            'password': parsed_url.password,
+            'host': parsed_url.hostname,
+            'port': parsed_url.port,
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],
+            'sslrootcert': cert_dest
+        }
+        conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
         tables = [row[0] for row in cursor.fetchall()]
@@ -147,13 +167,20 @@ def store_claims(df, upload_id):
         return
     try:
         url = os.getenv('DATABASE_URL')
-        conn = psycopg.connect(dbname=url.split('/')[3],
-                             user=url.split('//')[1].split(':')[0],
-                             password=url.split('//')[1].split(':')[1].split('@')[0],
-                             host=url.split('@')[1].split(':')[0],
-                             port=url.split(':')[3].split('/')[0],
-                             sslmode='require',
-                             sslcert=cert_dest)
+        parsed_url = urlparse(url)
+        dbname = parsed_url.path[1:]
+        conninfo = {
+            'dbname': dbname,
+            'user': parsed_url.username,
+            'password': parsed_url.password,
+            'host': parsed_url.hostname,
+            'port': parsed_url.port,
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['require'])[0],  # Default to require
+            'sslrootcert': cert_dest
+        }
+        logger.debug(f"Connecting to Postgres for store_claims with conninfo: {conninfo}")
+        logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")
+        conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
         ssn_col = next(col for col in df.columns if col.lower() in ['ssn', 'social security number'])
         date_col = [col for col in df.columns if 'date' in col.lower() or 'service' in col.lower()]
