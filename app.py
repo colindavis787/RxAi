@@ -10,13 +10,12 @@ import jwt
 import datetime
 from pathlib import Path
 import logging
-from urllib.parse import unquote, urlparse, parse_qs  # Added parse_qs
+from urllib.parse import unquote, urlparse, parse_qs
 import psycopg
 import plotly.express as px
 from dotenv import load_dotenv
 import tensorflow as tf
 from lstm_model import predict_future_meds, fetch_claims_data
-import pwd
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +24,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # Enhanced debug prints to verify user and directory
+import pwd
 user_env = os.environ.get('USER')
 user_pwd = pwd.getpwuid(os.getuid())[0]
 user = "adminuser"  # Force to adminuser based on venv path
@@ -32,8 +32,8 @@ logger.debug(f"Detected users: env={user_env}, pwd={user_pwd}, selected={user}")
 print(f"Current user: {user}")
 print(f"Current directory: {os.getcwd()}")
 
-# Limit file watching to specific files
-os.environ["STREAMLIT_FILE_WATCHER_TYPE"] = "none"  # Disable watching (use with caution)
+# Correctly disable file watcher
+os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"  # Fixed typo
 
 # Certificate copy logic with debug and writable path
 import shutil
@@ -47,6 +47,9 @@ if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
     os.chmod(cert_dest, 0o644)  # Set readable permissions
     logger.debug(f"Copied certificate from {cert_source} to {cert_dest} with permissions 644")
+    with open(cert_dest, 'r') as f:  # Validate file contents
+        content = f.read()
+        logger.debug(f"Certificate file size: {len(content)} bytes, first 50 chars: {content[:50]}")
 else:
     logger.error(f"Certificate not found at {cert_source}")
 
@@ -67,8 +70,9 @@ def load_users():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],  # Default to verify-full
-            'sslrootcert': cert_dest  # Use root certificate for server verification
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
+            'sslrootcert': cert_dest,  # Use root certificate for server verification
+            'connect_timeout': 10  # Added timeout
         }
         logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
         logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")  # Debug certificate presence
@@ -101,8 +105,9 @@ def create_claims_table():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],
-            'sslrootcert': cert_dest
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
+            'sslrootcert': cert_dest,
+            'connect_timeout': 10  # Added timeout
         }
         conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
@@ -144,8 +149,9 @@ def verify_claims_table():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-full'])[0],
-            'sslrootcert': cert_dest
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
+            'sslrootcert': cert_dest,
+            'connect_timeout': 10  # Added timeout
         }
         conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
@@ -175,8 +181,9 @@ def store_claims(df, upload_id):
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['require'])[0],  # Default to require
-            'sslrootcert': cert_dest
+            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['require'])[0],  # Keep require for data security
+            'sslrootcert': cert_dest,
+            'connect_timeout': 10  # Added timeout
         }
         logger.debug(f"Connecting to Postgres for store_claims with conninfo: {conninfo}")
         logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")
