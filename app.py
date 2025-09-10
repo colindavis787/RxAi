@@ -32,22 +32,27 @@ logger.debug(f"Detected users: env={user_env}, pwd={user_pwd}, selected={user}")
 print(f"Current user: {user}")
 print(f"Current directory: {os.getcwd()}")
 
-# Correctly disable file watcher
-os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"  # Fixed typo
+# Verify and set DATABASE_URL for debugging
+logger.debug(f"DATABASE_URL: {os.getenv('DATABASE_URL')}")
+
+# Attempt to disable file watcher with fallback
+os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+if 'watchdog' in os.listdir('/usr/local/lib/python3.11/site-packages'):
+    logger.warning("Watchdog still present; consider adding .streamlit/config.toml with [server] fileWatcherType = 'none'")
 
 # Certificate copy logic with debug and writable path
 import shutil
 cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
-cert_dest = f"/tmp/.postgresql/root.crt"  # Use /tmp for writable access
+cert_dest = f"/tmp/.postgresql/root.crt"
 logger.debug(f"Setting certificate destination to: {cert_dest}")
 if not os.path.exists("/tmp/.postgresql"):
-    os.makedirs("/tmp/.postgresql", exist_ok=True)  # Added exist_ok=True
+    os.makedirs("/tmp/.postgresql", exist_ok=True)
     logger.debug(f"Created directory: /tmp/.postgresql")
 if os.path.exists(cert_source):
     shutil.copy(cert_source, cert_dest)
-    os.chmod(cert_dest, 0o644)  # Set readable permissions
+    os.chmod(cert_dest, 0o644)
     logger.debug(f"Copied certificate from {cert_source} to {cert_dest} with permissions 644")
-    with open(cert_dest, 'r') as f:  # Validate file contents
+    with open(cert_dest, 'r') as f:
         content = f.read()
         logger.debug(f"Certificate file size: {len(content)} bytes, first 50 chars: {content[:50]}")
 else:
@@ -63,19 +68,19 @@ def load_users():
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
         parsed_url = urlparse(url)
-        dbname = parsed_url.path[1:]  # Remove leading '/' from path
+        dbname = parsed_url.path[1:]
         conninfo = {
             'dbname': dbname,
             'user': parsed_url.username,
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
-            'sslrootcert': cert_dest,  # Use root certificate for server verification
-            'connect_timeout': 10  # Added timeout
+            'sslmode': 'verify-ca',
+            'sslrootcert': cert_dest,
+            'connect_timeout': 10
         }
         logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
-        logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")  # Debug certificate presence
+        logger.debug(f"Certificate file exists before connection: {os.path.exists(cert_dest)}")  # New debug
         conn = psycopg.connect(**conninfo)
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
             cursor.execute("SELECT username, name, password FROM users")
@@ -89,7 +94,7 @@ def load_users():
     except Exception as e:
         logger.error(f"Failed to load users from database: {str(e)}")
         st.error(f"Database connection failed: {str(e)}. Using empty user list.")
-        return {}  # Default to empty dict so app starts
+        return {}
 
 # Create claims table
 def create_claims_table():
@@ -105,9 +110,9 @@ def create_claims_table():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
+            'sslmode': 'verify-ca',
             'sslrootcert': cert_dest,
-            'connect_timeout': 10  # Added timeout
+            'connect_timeout': 10
         }
         conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
@@ -149,9 +154,9 @@ def verify_claims_table():
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['verify-ca'])[0],  # Changed to verify-ca
+            'sslmode': 'verify-ca',
             'sslrootcert': cert_dest,
-            'connect_timeout': 10  # Added timeout
+            'connect_timeout': 10
         }
         conn = psycopg.connect(**conninfo)
         cursor = conn.cursor()
@@ -181,9 +186,9 @@ def store_claims(df, upload_id):
             'password': parsed_url.password,
             'host': parsed_url.hostname,
             'port': parsed_url.port,
-            'sslmode': parse_qs(parsed_url.query).get('sslmode', ['require'])[0],  # Keep require for data security
+            'sslmode': 'verify-ca',
             'sslrootcert': cert_dest,
-            'connect_timeout': 10  # Added timeout
+            'connect_timeout': 10
         }
         logger.debug(f"Connecting to Postgres for store_claims with conninfo: {conninfo}")
         logger.debug(f"Certificate exists: {os.path.exists(cert_dest)}")
