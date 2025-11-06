@@ -42,8 +42,8 @@ if 'watchdog' in os.listdir('/usr/local/lib/python3.11/site-packages'):
 
 # Certificate copy logic with debug and writable path
 import shutil
-cert_source = "/mount/src/rxai/us-east-1-bundle.pem"
-cert_dest = f"/tmp/.postgresql/root.crt"
+cert_source = os.getenv('RDS_CERT_PATH', '/app/certs/us-east-1-bundle.pem')  # Updated to match Dockerfile
+cert_dest = "/tmp/.postgresql/root.crt"
 logger.debug(f"Setting certificate destination to: {cert_dest}")
 if not os.path.exists("/tmp/.postgresql"):
     os.makedirs("/tmp/.postgresql", exist_ok=True)
@@ -57,9 +57,10 @@ if os.path.exists(cert_source):
         logger.debug(f"Certificate file size: {len(content)} bytes, first 50 chars: {content[:50]}")
 else:
     logger.error(f"Certificate not found at {cert_source}")
+    st.error(f"Certificate not found at {cert_source}. Contact support.")
 
 # JWT secret key
-JWT_SECRET_KEY = 'your_jwt_secret_key_12345'
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key_12345')  # Updated to use env variable
 
 # Load user credentials from database
 def load_users():
@@ -80,7 +81,7 @@ def load_users():
             'connect_timeout': 10
         }
         logger.debug(f"Connecting to Postgres database with conninfo: {conninfo}")
-        logger.debug(f"Certificate file exists before connection: {os.path.exists(cert_dest)}")  # New debug
+        logger.debug(f"Certificate file exists before connection: {os.path.exists(cert_dest)}")
         conn = psycopg.connect(**conninfo)
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
             cursor.execute("SELECT username, name, password FROM users")
@@ -90,13 +91,14 @@ def load_users():
         logger.debug(f"Loaded users from database: {list(users.keys())}")
         if not users:
             logger.warning("No users found in database")
+            st.warning("No users found in database. Contact support.")  # Added warning for empty users
         return users
     except Exception as e:
-        logger.error(f"Failed to load users from database: {str(e)}")
-        st.error(f"Database connection failed: {str(e)}. Using empty user list.")
+        logger.error(f"Failed to load users from database: {str(e)}", exc_info=True)  # Added exc_info for stack trace
+        st.error(f"Database connection failed: {str(e)}. Contact support.")  # Updated to show error
         return {}
 
-# Create claims table
+# Create claims table (unchanged)
 def create_claims_table():
     try:
         url = os.getenv('DATABASE_URL')
@@ -140,7 +142,7 @@ def create_claims_table():
     except Exception as e:
         st.error(f"Error creating claims table: {str(e)}")
 
-# Verify claims table exists
+# Verify claims table exists (unchanged)
 def verify_claims_table():
     try:
         url = os.getenv('DATABASE_URL')
@@ -170,7 +172,7 @@ def verify_claims_table():
     except Exception as e:
         st.error(f"Error verifying claims table: {str(e)}")
 
-# Store claims in PostgreSQL database
+# Store claims in PostgreSQL database (unchanged)
 def store_claims(df, upload_id):
     has_ssn = any(col.lower() in ['ssn', 'social security number'] for col in df.columns)
     if not has_ssn:
@@ -233,6 +235,33 @@ def store_claims(df, upload_id):
     except Exception as e:
         logger.error(f"Failed to store claims: {str(e)}")
         st.error(f"Database error: {str(e)}")
+
+# Move SQLite to PostgreSQL for consistency (new function)
+def load_past_uploads():
+    try:
+        url = os.getenv('DATABASE_URL')
+        if not url:
+            raise ValueError("DATABASE_URL environment variable not set")
+        parsed_url = urlparse(url)
+        dbname = parsed_url.path[1:]
+        conninfo = {
+            'dbname': dbname,
+            'user': parsed_url.username,
+            'password': parsed_url.password,
+            'host': parsed_url.hostname,
+            'port': parsed_url.port,
+            'sslmode': 'verify-ca',
+            'sslrootcert': cert_dest,
+            'connect_timeout': 10
+        }
+        conn = psycopg.connect(**conninfo)
+        past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
+        conn.close()
+        return past_uploads
+    except Exception as e:
+        logger.error(f"Error accessing historical data: {str(e)}")
+        st.error(f"Error accessing historical data: {str(e)}")
+        return pd.DataFrame()
 
 users = load_users()
 
@@ -332,16 +361,11 @@ if st.session_state.authenticated:
 
     with st.container():
         st.header("Past Uploads")
-        try:
-            conn = sqlite3.connect('claims_history.db')
-            past_uploads = pd.read_sql("SELECT DISTINCT upload_id, upload_date FROM claims", conn)
-            conn.close()
-            if not past_uploads.empty:
-                st.dataframe(past_uploads.head(25), use_container_width=True, hide_index=True)
-            else:
-                st.write("No past uploads found.")
-        except Exception as e:
-            st.error(f"Error accessing historical data: {str(e)}")
+        past_uploads = load_past_uploads()  # Updated to use PostgreSQL
+        if not past_uploads.empty:
+            st.dataframe(past_uploads.head(25), use_container_width=True, hide_index=True)
+        else:
+            st.write("No past uploads found.")
 
     col1, col2 = st.columns([2, 1])
     with col1:
