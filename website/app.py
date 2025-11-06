@@ -206,7 +206,7 @@ def register():
         try:
             conn = get_db_connection()
             with conn.cursor() as cursor:
-                cursor.execute('INSERT INTO users (username, name, password) VALUES (%s, %s, %s)', 
+                cursor.execute('INSERT INTO users (username, name, password) VALUES (%s, %s, %s)',
                                (username, name, hashed_password))
             conn.commit()
             logger.info(f"Successfully registered user: {username}")
@@ -224,6 +224,7 @@ def register():
         logger.debug("Rendering register.html for GET request")
         return render_template('register.html')
 
+# ==================== UPDATED DASHBOARD ROUTE ====================
 @app.route('/dashboard')
 def dashboard():
     logger.debug("Accessing dashboard route")
@@ -234,8 +235,12 @@ def dashboard():
         logger.error("Missing username or token in session, redirecting to login")
         flash('Session expired or invalid. Please log in again.', 'danger')
         return redirect(url_for('login'))
-    streamlit_url = os.getenv('STREAMLIT_URL', f"https://q9dhs7s8xfly3gtvwuwpfm.streamlit.app/?embedded=true&username={session.get('username', '')}&token={session.get('token', '')}")
+
+    streamlit_url = os.getenv('STREAMLIT_URL',
+        f"https://RxAiLoadBalancer-922017526.us-east-1.elb.amazonaws.com/?embedded=true&username={session.get('username', '')}&token={quote(session.get('token', ''))}"
+    )
     logger.debug(f"Streamlit URL: {streamlit_url}")
+
     try:
         import requests
         response = requests.head(streamlit_url, timeout=5)
@@ -245,7 +250,9 @@ def dashboard():
     except requests.RequestException as e:
         logger.error(f"Failed to reach Streamlit app: {str(e)}")
         flash('Streamlit app is currently unavailable. Please try again later.', 'danger')
+
     return render_template('dashboard.html', username=session['username'], streamlit_url=streamlit_url)
+# ================================================================
 
 @app.route('/logout', methods=['POST'])
 def logout():
